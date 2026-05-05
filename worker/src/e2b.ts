@@ -1,4 +1,4 @@
-export interface E2BResult {
+﻿export interface E2BResult {
   stdout: string;
   stderr: string;
   error: string | null;
@@ -21,14 +21,14 @@ export class E2BClient {
         "X-API-Key": this.apiKey,
       },
       body: JSON.stringify({
-        template: "Python3",
+        templateID: "base",
         timeout: Math.floor(timeoutMs / 1000),
         metadata: { source: "sg-analytics-engine" },
       }),
     });
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`E2B createSandbox failed: ${response.status} — ${err}`);
+      throw new Error(`E2B createSandbox failed: ${response.status} вЂ” ${err}`);
     }
     const data = await response.json() as { sandboxId: string };
     return data.sandboxId;
@@ -46,7 +46,7 @@ export class E2BClient {
     });
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`E2B runCode failed: ${response.status} — ${err}`);
+      throw new Error(`E2B runCode failed: ${response.status} вЂ” ${err}`);
     }
     const data = await response.json() as {
       stdout?: string;
