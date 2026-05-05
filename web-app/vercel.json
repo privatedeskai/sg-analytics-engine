@@ -1,8 +1,1 @@
-﻿{
-  "outputDirectory": ".",
-  "functions": {
-    "api/e2b-proxy.mjs": {
-      "maxDuration": 60
-    }
-  }
-}
+{"outputDirectory":".","functions":{"api/e2b-proxy.mjs":{"maxDuration":60}}}
