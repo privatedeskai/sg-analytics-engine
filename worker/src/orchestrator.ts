@@ -68,10 +68,10 @@ export class AnalysisOrchestrator implements DurableObject {
   }
 
   private getIterationMessage(i: number): string {
-    if (i <= 2) return "Loading data, checking structure... (" + Math.round(i/10*100) + "%)";
-    if (i <= 4) return "Grouping by periods, searching for anomalies... (" + Math.round(i/10*100) + "%)";
-    if (i <= 7) return "Testing hypotheses, deepening analysis... (" + Math.round(i/10*100) + "%)";
-    return "Forming conclusions and recommendations... (" + Math.round(i/10*100) + "%)";
+    if (i <= 2) return "Loading data, checking structure... (" + Math.round(i / 10 * 100) + "%)";
+    if (i <= 4) return "Grouping by periods, searching for anomalies... (" + Math.round(i / 10 * 100) + "%)";
+    if (i <= 7) return "Testing hypotheses, deepening analysis... (" + Math.round(i / 10 * 100) + "%)";
+    return "Forming conclusions and recommendations... (" + Math.round(i / 10 * 100) + "%)";
   }
 
   private async runAnalysis(req: AnalysisRequest): Promise<void> {
@@ -95,16 +95,17 @@ export class AnalysisOrchestrator implements DurableObject {
 
       const schemaCode = [
         "import pandas as pd, json",
-        "df = pd.read_csv("/tmp/data.csv")",
-        "info = {"columns": list(df.columns), "dtypes": {c: str(df[c].dtype) for c in df.columns}, "shape": list(df.shape)}",
+        "df = pd.read_csv('/tmp/data.csv')",
+        "info = {'columns': list(df.columns), 'dtypes': {c: str(df[c].dtype) for c in df.columns}, 'shape': list(df.shape)}",
         "sample = df.head(3).to_csv(index=False)",
-        "print(json.dumps({"schema": info, "sample": sample}))"
+        "print(json.dumps({'schema': info, 'sample': sample}))",
       ].join("\n");
+
       const schemaRun = await e2b.runCode(sandboxId, schemaCode);
 
       let dataDescription = csvContent.split("\n").slice(0, 2).join(" | ");
       try {
-        const parsed = JSON.parse(schemaRun.stdout);
+        const parsed = JSON.parse(schemaRun.stdout) as any;
         dataDescription = JSON.stringify(parsed.schema) + "\nSample:\n" + parsed.sample;
       } catch { /* use default */ }
 
