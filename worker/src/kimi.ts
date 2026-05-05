@@ -20,7 +20,7 @@ export class KimiClient {
     // baseUrl: 'https://api.deepinfra.com/v1/openai'
     // model: 'moonshotai/Kimi-K2-Instruct'
     this.baseUrl = 'https://api.anthropic.com/v1';
-    this.model = 'claude-sonnet-4-20250514';
+    this.model = 'claude-sonnet-4-5';
   }
 
   async generatePython(dataDescription: string, question: string, previousResult?: string, iteration?: number): Promise<string> {

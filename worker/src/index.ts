@@ -18,7 +18,7 @@ const corsHeaders = {
 };
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
@@ -29,7 +29,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/status') {
       return Response.json({
         status: 'ok',
-        version: '0.5.0',
+        version: '0.6.0',
         session: 5,
         timestamp: new Date().toISOString(),
         components: {
@@ -61,6 +61,18 @@ export default {
       const sessionId = existingSession || crypto.randomUUID();
       const maxIterations = parseInt(env.MAX_ITERATIONS || '3');
 
+      // Сразу пишем начальный статус в KV — чтобы /result не возвращал 404
+      await env.KV.put(`session:${sessionId}`, JSON.stringify({
+        sessionId,
+        status: 'started',
+        iteration: 0,
+        total: maxIterations,
+        message: 'Initializing analysis...',
+        startedAt: new Date().toISOString(),
+        question,
+      }), { expirationTtl: 86400 }); // 24 часа
+
+      // Запускаем DO через waitUntil — Worker живёт до завершения
       const id = env.ORCHESTRATOR.idFromName(sessionId);
       const orchestrator = env.ORCHESTRATOR.get(id);
 
@@ -77,7 +89,15 @@ export default {
         }),
       });
 
-      orchestrator.fetch(orchestratorRequest).catch(() => {});
+      ctx.waitUntil(orchestrator.fetch(orchestratorRequest).catch((err) => {
+        // Если DO упал — пишем ошибку в KV
+        return env.KV.put(`session:${sessionId}`, JSON.stringify({
+          sessionId,
+          status: 'error',
+          message: 'Orchestrator failed: ' + String(err),
+          error: String(err),
+        }), { expirationTtl: 86400 });
+      }));
 
       return Response.json({
         sessionId,
@@ -93,19 +113,17 @@ export default {
         return Response.json({ error: 'Missing sessionId' }, { status: 400, headers: corsHeaders });
       }
 
-      const id = env.ORCHESTRATOR.idFromName(sessionId);
-      const orchestrator = env.ORCHESTRATOR.get(id);
-
-      const statusRequest = new Request('https://internal/status?sessionId=' + sessionId, {
-        method: 'GET',
-      });
+      // Читаем статус из KV (туда пишет и index.ts при старте, и orchestrator по ходу)
+      const raw = await env.KV.get(`session:${sessionId}`);
+      if (!raw) {
+        return Response.json({ error: 'Session not found', sessionId }, { status: 404, headers: corsHeaders });
+      }
 
       try {
-        const statusResponse = await orchestrator.fetch(statusRequest);
-        const statusData = await statusResponse.json();
-        return Response.json(statusData, { headers: corsHeaders });
+        const sessionData = JSON.parse(raw);
+        return Response.json(sessionData, { headers: corsHeaders });
       } catch {
-        return Response.json({ error: 'Session not found', sessionId }, { status: 404, headers: corsHeaders });
+        return Response.json({ error: 'Malformed session data', sessionId }, { status: 500, headers: corsHeaders });
       }
     }
 
