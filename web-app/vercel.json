@@ -1,7 +1,7 @@
-{
+﻿{
   "outputDirectory": ".",
   "functions": {
-    "api/e2b-proxy.js": {
+    "api/e2b-proxy.mjs": {
       "maxDuration": 60
     }
   }
