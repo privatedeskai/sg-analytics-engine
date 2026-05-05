@@ -1,12 +1,12 @@
 # SG Analytics Engine — Статус проекта
 **Этап:** Э1 — Универсальный CSV Analyst
 **Обновлено:** 2026-05-05
-**Сессия:** 1
+**Сессия:** 2
 
 ---
 
 ## Репозиторий
-- GitHub: github.com/privatedeskai/sg-analytics-engine
+- GitHub: https://github.com/privatedeskai/sg-analytics-engine
 - Папка: C:\Users\dorof\Documents\sg-analytics-engine
 - Ветка: main
 
@@ -16,11 +16,8 @@
 
 ```powershell
 cd C:\Users\dorof\Documents\sg-analytics-engine\worker
-
 npx wrangler deploy
-
 cd web-app ; npx vercel --prod --yes ; cd ..
-
 git add . ; git commit -m "checkpoint: [описание]" ; git push
 ```
 
@@ -28,7 +25,7 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 
 ## Живые URL
 - Worker: https://sg-analytics-engine.dorofeevov17.workers.dev
-- Web App: не задеплоен
+- Web App: https://web-app-liart-gamma.vercel.app
 
 ---
 
@@ -38,51 +35,63 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 |-----------|--------|-------------|
 | Репозиторий | ✅ | github.com/privatedeskai/sg-analytics-engine |
 | Worker деплой | ✅ | https://sg-analytics-engine.dorofeevov17.workers.dev |
-| E2B клиент | ✅ | worker/src/e2b.ts |
-| Kimi K2.6 клиент | ✅ | worker/src/kimi.ts |
-| Оркестратор | ✅ | worker/src/orchestrator.ts |
+| E2B клиент | ✅ | Piston API — работает |
+| Kimi/Claude клиент | ⚠️ | kimi.ts сломан — синтаксис строки 41 |
+| Оркестратор | ✅ | orchestrator.ts — использует CLAUDE_API_KEY |
 | Secrets | ✅ | E2B_API_KEY, DEEPINFRA_API_KEY, CLAUDE_API_KEY |
 | KV namespace | ✅ | id: 5884f641df3441deb36344e8be2e5ab6 |
-| CSV загрузчик | ⬜ | День 2 |
-| Output formatter | ⬜ | День 2 |
-| Базовый UI | ⬜ | День 3 |
-| Stripe биллинг | ⬜ | День 5 |
-| Деплой Vercel | ⬜ | День 3 |
+| CSV загрузчик | ⬜ | |
+| Output formatter | ⬜ | |
+| Базовый UI | ⬜ | |
+| Stripe биллинг | ⬜ | |
 
 ---
 
-## API ключи
-- [x] E2B API key — добавлен как secret
-- [x] Kimi K2.6 key (DeepInfra) — добавлен как secret
-- [x] Claude API key — добавлен как secret
-- [ ] Stripe — следующий этап
+## КРИТИЧНО — Что сломано и что делать в начале сессии 3
+
+### Проблема 1: kimi.ts строка 41 — синтаксическая ошибка
+Строка выглядит так (НЕПРАВИЛЬНО):
+x-api-key": this.apiKey, "anthropic-version": "2023-06-01",
+Должна выглядеть так (ПРАВИЛЬНО):
+"x-api-key": this.apiKey, "anthropic-version": "2023-06-01",
+Починить через GitHub:
+https://github.com/privatedeskai/sg-analytics-engine/blob/main/worker/src/kimi.ts
+
+### Проблема 2: git не синхронизирован с GitHub
+Выполнить в начале сессии:
+```powershell
+cd C:\Users\dorof\Documents\sg-analytics-engine ; git pull
+```
+
+### После починки — задеплоить:
+```powershell
+cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
+```
+
+### После деплоя — протестировать:
+```powershell
+$csv = Get-Content "..\test-data.csv" -Raw ; $body = @{ question = "Какая категория товаров самая прибыльная?"; csvContent = $csv; userId = "test-user"; language = "ru" } | ConvertTo-Json ; $response = Invoke-RestMethod -Uri "https://sg-analytics-engine.dorofeevov17.workers.dev/analyze" -Method POST -ContentType "application/json" -Body $body ; Write-Host $response.sessionId
+```
 
 ---
 
-## Следующие задачи (по приоритету)
-1. День 2: тест /analyze с реальным CSV
-2. День 2: CSV коннектор — парсинг, нормализация, валидация
-3. День 3: базовый UI (чат + дашборд) на Vercel
+## ВАЖНО — Временное решение (вернуть после отладки)
+- Сейчас используется Claude API вместо Kimi K2.6
+- После отладки: пополнить баланс на https://deepinfra.com → вернуть в kimi.ts baseUrl на DeepInfra и модель на Kimi-K2-Instruct
 
 ---
 
 ## История сессий
 
-### Сессия 0 — 2026-05-04 (инициализация)
-- Разработана концепция, выбран стек, созданы PROJECT_INSTRUCTIONS.md и PROJECT_STATUS.md
+### Сессия 0 — 2026-05-04
+Разработана концепция, выбран стек.
 
-### Сессия 1 — 2026-05-05
-**Сделано:**
-- Создана структура репозитория
-- E2B клиент: createSandbox, runCode, uploadCSV, downloadFile
-- Kimi K2.6 клиент: planAnalysis, iterate, finalSummary
-- Оркестратор: Durable Object, итерационный цикл до 10 шагов
-- Main Worker: CORS, /health, /analyze, /status
-- Все secrets добавлены в Cloudflare
-- KV namespace создан
-- Worker задеплоен ✅
+### Сессия 1 — 2026-05-04
+Worker задеплоен, все secrets добавлены, файлы созданы.
 
-**Следующая сессия — День 2:**
-1. Тест /analyze с реальным CSV
-2. CSV коннектор с валидацией
-3. Проверить реальный E2B API endpoint по документации
+### Сессия 2 — 2026-05-05
+- Добавлен .gitignore для node_modules
+- E2B переключён на Piston API (E2B SDK несовместим с CF Workers)
+- Claude API подключён временно вместо Kimi (нет баланса DeepInfra)
+- kimi.ts содержит синтаксическую ошибку в строке 41 — починить в начале сессии 3
+  
