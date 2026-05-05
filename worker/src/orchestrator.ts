@@ -1,4 +1,4 @@
-import { E2BClient } from "./e2b";
+﻿import { E2BClient } from "./e2b";
 import { KimiClient } from "./kimi";
 
 export interface AnalysisRequest {
@@ -35,16 +35,16 @@ export interface AnalysisResult {
 }
 
 const ITER_MSG: Record<number, string> = {
-  1: "Загружаю данные, проверяю структуру...",
-  2: "Изучаю распределение и качество данных...",
-  3: "Ищу основные паттерны и тренды...",
-  4: "Проверяю аномалии и выбросы...",
-  5: "Анализирую корреляции...",
-  6: "Углубляюсь в причины...",
-  7: "Сегментирую данные...",
-  8: "Верифицирую находки...",
-  9: "Формирую рекомендации...",
-  10: "Финализирую отчёт...",
+  1: "Р—Р°РіСЂСѓР¶Р°СЋ РґР°РЅРЅС‹Рµ, РїСЂРѕРІРµСЂСЏСЋ СЃС‚СЂСѓРєС‚СѓСЂСѓ...",
+  2: "РР·СѓС‡Р°СЋ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ Рё РєР°С‡РµСЃС‚РІРѕ РґР°РЅРЅС‹С…...",
+  3: "РС‰Сѓ РѕСЃРЅРѕРІРЅС‹Рµ РїР°С‚С‚РµСЂРЅС‹ Рё С‚СЂРµРЅРґС‹...",
+  4: "РџСЂРѕРІРµСЂСЏСЋ Р°РЅРѕРјР°Р»РёРё Рё РІС‹Р±СЂРѕСЃС‹...",
+  5: "РђРЅР°Р»РёР·РёСЂСѓСЋ РєРѕСЂСЂРµР»СЏС†РёРё...",
+  6: "РЈРіР»СѓР±Р»СЏСЋСЃСЊ РІ РїСЂРёС‡РёРЅС‹...",
+  7: "РЎРµРіРјРµРЅС‚РёСЂСѓСЋ РґР°РЅРЅС‹Рµ...",
+  8: "Р’РµСЂРёС„РёС†РёСЂСѓСЋ РЅР°С…РѕРґРєРё...",
+  9: "Р¤РѕСЂРјРёСЂСѓСЋ СЂРµРєРѕРјРµРЅРґР°С†РёРё...",
+  10: "Р¤РёРЅР°Р»РёР·РёСЂСѓСЋ РѕС‚С‡С‘С‚...",
 };
 
 export class AnalysisOrchestrator implements DurableObject {
@@ -81,7 +81,7 @@ export class AnalysisOrchestrator implements DurableObject {
     const maxIter = req.maxIterations || 10;
     const { sessionId, question, csvContent, language = "ru" } = req;
     const e2b = new E2BClient(this.env.E2B_API_KEY);
-    const kimi = new KimiClient(this.env.DEEPINFRA_API_KEY);
+    const kimi = new KimiClient(this.env.CLAUDE_API_KEY);
     const result: AnalysisResult = {
       sessionId, summary: "", iterations: [], charts: [],
       totalTokens: 0, durationMs: 0,
@@ -91,7 +91,7 @@ export class AnalysisOrchestrator implements DurableObject {
     try {
       await this.saveStatus({
         sessionId, iteration: 0, total: maxIter,
-        message: "Инициализирую sandbox...", status: "running",
+        message: "РРЅРёС†РёР°Р»РёР·РёСЂСѓСЋ sandbox...", status: "running",
       });
 
       sandboxId = await e2b.createSandbox(180000);
@@ -126,7 +126,7 @@ print(json.dumps({"schema": info, "sample": sample}))
       for (let i = 1; i <= maxIter; i++) {
         await this.saveStatus({
           sessionId, iteration: i, total: maxIter,
-          message: ITER_MSG[i] || `Итерация ${i}...`, status: "running",
+          message: ITER_MSG[i] || `РС‚РµСЂР°С†РёСЏ ${i}...`, status: "running",
         });
 
         let plan;
@@ -176,7 +176,7 @@ print(json.dumps({"schema": info, "sample": sample}))
 
       await this.saveStatus({
         sessionId, iteration: maxIter, total: maxIter,
-        message: "Анализ завершён", status: "done", result,
+        message: "РђРЅР°Р»РёР· Р·Р°РІРµСЂС€С‘РЅ", status: "done", result,
       });
 
     } catch (err) {
@@ -185,7 +185,7 @@ print(json.dumps({"schema": info, "sample": sample}))
       result.durationMs = Date.now() - startTime;
       await this.saveStatus({
         sessionId, iteration: 0, total: maxIter,
-        message: `Ошибка: ${errMsg}`, status: "error", result,
+        message: `РћС€РёР±РєР°: ${errMsg}`, status: "error", result,
       });
     } finally {
       if (sandboxId) await e2b.closeSandbox(sandboxId);

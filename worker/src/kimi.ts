@@ -1,4 +1,4 @@
-export interface KimiMessage {
+﻿export interface KimiMessage {
   role: "system" | "user" | "assistant";
   content: string;
 }
@@ -10,7 +10,7 @@ export interface AnalysisPlan {
 }
 
 const SYSTEM_ANALYST = `You are an expert data analyst. Write Python code to analyze CSV data.
-Respond ONLY with a valid JSON object — no markdown fences, no text outside JSON:
+Respond ONLY with a valid JSON object вЂ” no markdown fences, no text outside JSON:
 {"pythonCode": "...", "hypothesis": "...", "expectedOutput": "..."}
 
 Python rules:
@@ -19,12 +19,12 @@ Python rules:
 - Save charts: plt.savefig('/tmp/chart_N.png', dpi=100, bbox_inches='tight') then plt.close()
 - Print ALL results as JSON: import json; print(json.dumps({"key": value}))
 - Handle NaN, empty columns, wrong types gracefully
-- Never invent numbers — compute everything from data`;
+- Never invent numbers вЂ” compute everything from data`;
 
 export class KimiClient {
   private apiKey: string;
-  private baseUrl = "https://api.deepinfra.com/v1/openai";
-  private model = "moonshotai/Kimi-K2-Instruct";
+  private baseUrl = "https://api.anthropic.com/v1";
+  private model = "claude-sonnet-4-20250514";
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -38,7 +38,7 @@ export class KimiClient {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+        x-api-key": this.apiKey, "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: this.model,
@@ -49,7 +49,7 @@ export class KimiClient {
     });
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Kimi API failed: ${response.status} — ${err}`);
+      throw new Error(`Kimi API failed: ${response.status} вЂ” ${err}`);
     }
     const data = await response.json() as {
       choices: Array<{ message: { content: string } }>;
@@ -122,9 +122,9 @@ export class KimiClient {
           role: "system",
           content: `You are a business analyst. Write executive summary in ${lang === "ru" ? "Russian" : "English"}.
 Structure:
-1. Главный вывод (1-2 предложения, главная цифра)
-2. Ключевые находки (3-5 пунктов с конкретными числами)
-3. Рекомендации (2-3 конкретных действия)
+1. Р“Р»Р°РІРЅС‹Р№ РІС‹РІРѕРґ (1-2 РїСЂРµРґР»РѕР¶РµРЅРёСЏ, РіР»Р°РІРЅР°СЏ С†РёС„СЂР°)
+2. РљР»СЋС‡РµРІС‹Рµ РЅР°С…РѕРґРєРё (3-5 РїСѓРЅРєС‚РѕРІ СЃ РєРѕРЅРєСЂРµС‚РЅС‹РјРё С‡РёСЃР»Р°РјРё)
+3. Р РµРєРѕРјРµРЅРґР°С†РёРё (2-3 РєРѕРЅРєСЂРµС‚РЅС‹С… РґРµР№СЃС‚РІРёСЏ)
 Be specific. Use exact numbers. No vague statements.`,
         },
         {
