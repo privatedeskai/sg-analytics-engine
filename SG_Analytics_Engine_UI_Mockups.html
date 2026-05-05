@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Analytics Engine — UI Концепция интерфейса</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#F5F5F5;color:#222;padding:2rem}
+.page-title{font-size:24px;font-weight:500;color:#1A3A6B;margin-bottom:4px}
+.page-sub{font-size:13px;color:#888;margin-bottom:2rem}
+.section{margin-bottom:2.5rem}
+.section-label{font-size:11px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.badge{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500}
+.b-green{background:#EAF3DE;color:#27500A}
+.b-blue{background:#E6F1FB;color:#0C447C}
+.b-amber{background:#FAEEDA;color:#633806}
+.b-gray{background:#E8E8E8;color:#555}
+.mock{background:#fff;border:1px solid #E0E0E0;border-radius:12px;overflow:hidden}
+.mock-header{background:#F8F8F8;padding:8px 14px;font-size:11px;color:#888;border-bottom:1px solid #E8E8E8;display:flex;align-items:center;gap:8px}
+.dot-row{display:flex;gap:4px}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot-r{background:#FF5F57}
+.dot-y{background:#FEBC2E}
+.dot-g{background:#28C840}
+.mock-body{padding:16px}
+
+/* ВАРИАНТ B — Гибридный */
+.hybrid{display:flex;height:360px;gap:0}
+.hybrid-chat{width:270px;flex-shrink:0;border-right:1px solid #EEEEEE;display:flex;flex-direction:column;padding:12px;gap:8px}
+.hybrid-dash{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;background:#FAFAFA}
+.chat-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.msg-user{background:#F0F0F0;border-radius:8px;padding:7px 10px;font-size:11px;color:#222;align-self:flex-end;max-width:85%}
+.msg-ai{background:#E8F0FE;border-radius:8px;padding:7px 10px;font-size:11px;color:#1A3A6B;border-left:2px solid #378ADD;line-height:1.5}
+.msgs{display:flex;flex-direction:column;gap:6px;flex:1;overflow:hidden}
+.chat-input-bar{display:flex;align-items:center;gap:6px;border:1px solid #DDD;border-radius:8px;padding:5px 10px;background:#fff}
+.chat-input-bar span{flex:1;font-size:11px;color:#AAA}
+.send-btn{width:22px;height:22px;border-radius:5px;background:#1A3A6B;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dash-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em}
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kpi{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:8px 10px}
+.kpi-l{font-size:10px;color:#888;margin-bottom:2px}
+.kpi-v{font-size:17px;font-weight:500;color:#222}
+.kpi-d-r{font-size:10px;color:#A32D2D}
+.kpi-d-g{font-size:10px;color:#27500A}
+.chart-area{background:#fff;border:1px solid #EEEEEE;border-radius:8px;flex:1;display:flex;align-items:flex-end;padding:10px;gap:4px}
+.bar{border-radius:2px 2px 0 0}
+.progress-bar{background:#F0F0F0;border-radius:6px;padding:7px 10px;font-size:10px;color:#555;display:flex;align-items:center;gap:6px}
+.progress-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* СОХРАНЕНИЕ ШАБЛОНА */
+.save-flow{display:flex;flex-direction:column;gap:10px}
+.analysis-result{background:#E8F0FE;border-radius:8px;padding:10px 12px;font-size:11px;color:#1A3A6B;line-height:1.5;border-left:2px solid #378ADD}
+.result-charts{display:flex;gap:4px;margin-top:8px;align-items:flex-end;height:32px}
+.save-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#F8F8F8;border-radius:8px;border:1px solid #E0E0E0}
+.save-bar-icon{color:#378ADD;font-size:14px}
+.save-bar-text{font-size:11px;color:#888;flex:1}
+.save-input{font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid #D0D0D0;background:#fff;color:#222;min-width:180px}
+.save-btn{font-size:11px;padding:4px 12px;border-radius:6px;background:#1A3A6B;color:#fff;border:none;cursor:pointer;white-space:nowrap}
+
+/* ДАШБОРД ШАБЛОНОВ */
+.templates-list{display:flex;flex-direction:column;gap:6px}
+.tpl-card{background:#fff;border:1px solid #EEEEEE;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.tpl-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.icon-g{background:#E8F5E9}
+.icon-b{background:#E6F1FB}
+.icon-a{background:#FFF8E1}
+.tpl-info{flex:1}
+.tpl-name{font-size:12px;font-weight:500;color:#222}
+.tpl-meta{font-size:10px;color:#888;margin-top:2px;display:flex;align-items:center;gap:4px}
+.status-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sd-green{background:#1D9E75}
+.sd-gray{background:#BDBDBD}
+.tpl-actions{display:flex;gap:6px;align-items:center}
+.tpl-mini-chart{display:flex;align-items:flex-end;gap:2px;height:22px}
+.tmb{width:5px;border-radius:1px 1px 0 0;background:#378ADD}
+.tmb-r{background:#E24B4A}
+.btn-sm{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid #D8D8D8;background:#fff;color:#333;cursor:pointer;white-space:nowrap}
+.btn-sm-primary{background:#1A3A6B;color:#fff;border-color:#1A3A6B}
+.tpl-add{border:1px dashed #D0D0D0;border-radius:10px;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:6px;color:#AAA;font-size:12px;cursor:pointer}
+
+/* ИСТОРИЯ ОТЧЁТОВ */
+.reports-list{display:flex;flex-direction:column}
+.report-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #F0F0F0}
+.report-row:last-child{border-bottom:none}
+.report-name{font-size:12px;color:#222;flex:1}
+.report-date{font-size:11px;color:#AAA;min-width:80px}
+.report-modes{display:flex;gap:4px;align-items:center}
+.mode-badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:500}
+.mb-fast{background:#E8F5E9;color:#27500A}
+.mb-full{background:#E6F1FB;color:#0C447C}
+
+/* РЕЖИМЫ ЗАПУСКА */
+.modes-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode-card{border-radius:10px;padding:12px 14px;border:1px solid #EEEEEE}
+.mode-card-fast{background:#F0FBF4;border-color:#A8D5B5}
+.mode-card-full{background:#EEF4FD;border-color:#A8C4E8}
+.mode-title{font-size:12px;font-weight:500;margin-bottom:4px}
+.mode-title-fast{color:#1D7A4A}
+.mode-title-full{color:#1A3A6B}
+.mode-desc{font-size:11px;color:#555;line-height:1.5;margin-bottom:8px}
+.mode-stat{font-size:11px;color:#888}
+.mode-stat span{font-weight:500;color:#222}
+.auto-badge{font-size:10px;background:#F5F5F5;border:1px solid #E0E0E0;border-radius:4px;padding:2px 7px;color:#555;display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+</style>
+</head>
+<body>
+
+<div class="page-title">SG Analytics Engine</div>
+<div class="page-sub">UI Концепция — Интерфейс, шаблоны, отчёты · v1.1 · 2026-05-04</div>
+
+<!-- ВАРИАНТ B — ВЫБРАННЫЙ -->
+<div class="section">
+  <div class="section-label">
+    Выбранный вариант — Гибридный интерфейс: Чат + Живой дашборд (Э1)
+    <span class="badge b-green">Выбран для Э1</span>
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="dot-row"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      SG Analytics Engine
+    </div>
+    <div class="mock-body" style="padding:0">
+      <div class="hybrid">
+        <div class="hybrid-chat">
+          <div class="chat-label">Чат с аналитиком</div>
+          <div class="msgs">
+            <div class="msg-user">Почему упали продажи на прошлой неделе?</div>
+            <div class="progress-bar">
+              <div class="progress-dot"></div>
+              Анализирую категории товаров... итерация 5/10
+            </div>
+            <div class="msg-ai">Продажи упали на 23%. Причина: Электроника -67%. Конкурент снизил цены в пятницу — это повторяющийся паттерн (4-й раз за квартал).</div>
+            <div class="msg-user">Стоит ли снижать цену?</div>
+            <div class="msg-ai">Не снижать. Конкурент вернёт цену к понедельнику с вероятностью 85%. Ваша маржа при снижении упадёт с 41% до 29%.</div>
+          </div>
+          <div class="chat-input-bar">
+            <span>Задайте вопрос...</span>
+            <div class="send-btn">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 8L8 5 2 2v2.5l4 .5-4 .5V8z" fill="white"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="hybrid-dash">
+          <div class="dash-label">Дашборд — обновляется по ходу диалога</div>
+          <div class="kpi-row">
+            <div class="kpi"><div class="kpi-l">Выручка</div><div class="kpi-v">$18,400</div><div class="kpi-d-r">-23% vs нед. 17</div></div>
+            <div class="kpi"><div class="kpi-l">Маржа</div><div class="kpi-v">41.5%</div><div class="kpi-d-g">Удержать</div></div>
+            <div class="kpi"><div class="kpi-l">Конверсия</div><div class="kpi-v">2.1%</div><div class="kpi-d-r">-0.8%</div></div>
+            <div class="kpi"><div class="kpi-l">Алертов</div><div class="kpi-v">3 SKU</div><div class="kpi-d-r">Требуют внимания</div></div>
+          </div>
+          <div class="chart-area">
+            <div class="bar" style="height:55%;width:100%;background:#378ADD;"></div>
+            <div class="bar" style="height:70%;width:100%;background:#378ADD;"></div>
+            <div class="bar" style="height:65%;width:100%;background:#378ADD;"></div>
+            <div class="bar" style="height:82%;width:100%;background:#378ADD;"></div>
+            <div class="bar" style="height:52%;width:100%;background:#E24B4A;"></div>
+            <div class="bar" style="height:46%;width:100%;background:#E24B4A;"></div>
+            <div class="bar" style="height:44%;width:100%;background:#E24B4A;"></div>
+          </div>
+          <div style="font-size:10px;color:#888;text-align:center">Выручка по дням — текущая неделя</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- СОХРАНЕНИЕ ШАБЛОНА -->
+<div class="section">
+  <div class="section-label">
+    Сохранение анализа как шаблона — flow из чата
+    <span class="badge b-blue">Тип объекта 1: Шаблон</span>
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="dot-row"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      Сохранить результат анализа
+    </div>
+    <div class="mock-body">
+      <div class="save-flow">
+        <div style="display:flex;justify-content:flex-end">
+          <div class="msg-user">Покажи топ-5 убыточных товаров недели</div>
+        </div>
+        <div class="analysis-result">
+          Анализ завершён за 8 итераций. Топ аутсайдеры: Товар A (-45%), Товар B (-38%), Товар C (-29%), Товар D (-24%), Товар E (-18%). Общие потери категории: $2,340 за неделю.
+          <div class="result-charts">
+            <div style="height:100%;width:18%;background:#E24B4A;border-radius:2px 2px 0 0"></div>
+            <div style="height:83%;width:18%;background:#E24B4A;border-radius:2px 2px 0 0"></div>
+            <div style="height:64%;width:18%;background:#EF9F27;border-radius:2px 2px 0 0"></div>
+            <div style="height:52%;width:18%;background:#EF9F27;border-radius:2px 2px 0 0"></div>
+            <div style="height:40%;width:18%;background:#EF9F27;border-radius:2px 2px 0 0"></div>
+          </div>
+        </div>
+        <div class="save-bar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10V12h10V10M7 2v6M4 5l3-3 3 3" stroke="#378ADD" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div class="save-bar-text">Сохранить как шаблон для повторного запуска</div>
+          <input class="save-input" value="Убыточные товары недели" readonly>
+          <button class="save-btn">Сохранить</button>
+        </div>
+        <div style="font-size:10px;color:#AAA;padding:0 2px">После сохранения шаблон появится на дашборде. Можно настроить расписание: каждый понедельник в 09:00.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ДАШБОРД ШАБЛОНОВ -->
+<div class="section">
+  <div class="section-label">
+    Дашборд шаблонов — персональная лента аналитических запросов
+    <span class="badge b-green">Тип объекта 2: Дашборд</span>
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="dot-row"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      Мои шаблоны
+    </div>
+    <div class="mock-body">
+      <div class="templates-list">
+        <div class="tpl-card">
+          <div class="tpl-icon icon-g">📊</div>
+          <div class="tpl-info">
+            <div class="tpl-name">Еженедельный отчёт по продажам</div>
+            <div class="tpl-meta"><div class="status-dot sd-green"></div>Каждый пн 09:00 · последний запуск 3 дня назад</div>
+          </div>
+          <div class="tpl-actions">
+            <div class="tpl-mini-chart">
+              <div class="tmb" style="height:55%"></div><div class="tmb" style="height:75%"></div>
+              <div class="tmb" style="height:70%"></div><div class="tmb tmb-r" style="height:48%"></div>
+            </div>
+            <span class="badge b-green">Готов</span>
+            <button class="btn-sm">Открыть</button>
+            <button class="btn-sm btn-sm-primary">Запустить</button>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-icon icon-b">⏱</div>
+          <div class="tpl-info">
+            <div class="tpl-name">Мониторинг цен конкурентов</div>
+            <div class="tpl-meta"><div class="status-dot sd-green"></div>Ежедневно 08:00 · только что</div>
+          </div>
+          <div class="tpl-actions">
+            <span class="badge b-amber">3 изменения</span>
+            <button class="btn-sm">Открыть</button>
+            <button class="btn-sm btn-sm-primary">Запустить</button>
+          </div>
+        </div>
+        <div class="tpl-card">
+          <div class="tpl-icon icon-a">📈</div>
+          <div class="tpl-info">
+            <div class="tpl-name">Убыточные товары недели</div>
+            <div class="tpl-meta"><div class="status-dot sd-gray"></div>Без расписания · 7 дней назад</div>
+          </div>
+          <div class="tpl-actions">
+            <span class="badge b-gray">Не обновлялся</span>
+            <button class="btn-sm">Открыть</button>
+            <button class="btn-sm btn-sm-primary">Запустить</button>
+          </div>
+        </div>
+        <div class="tpl-add">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="#BDBDBD" stroke-width="1.4" stroke-linecap="round"/></svg>
+          Добавить шаблон из чата или библиотеки
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ИСТОРИЯ ОТЧЁТОВ -->
+<div class="section">
+  <div class="section-label">
+    История отчётов с режимами запуска
+    <span class="badge b-amber">Тип объекта 3: Отчёт</span>
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="dot-row"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      История отчётов
+    </div>
+    <div class="mock-body">
+      <div class="reports-list">
+        <div class="report-row">
+          <div class="report-name">Еженедельный отчёт — нед. 18</div>
+          <div class="report-date">Пн 28 апр</div>
+          <div class="report-modes"><span class="mode-badge mb-fast">Быстрый · 5 сек</span></div>
+          <span class="badge b-green" style="margin:0 8px">Готов</span>
+          <button class="btn-sm">PDF</button>
+        </div>
+        <div class="report-row">
+          <div class="report-name">Мониторинг цен конкурентов</div>
+          <div class="report-date">Вт 29 апр</div>
+          <div class="report-modes"><span class="mode-badge mb-fast">Быстрый · 5 сек</span></div>
+          <span class="badge b-amber" style="margin:0 8px">3 алерта</span>
+          <button class="btn-sm">PDF</button>
+        </div>
+        <div class="report-row">
+          <div class="report-name">Убыточные товары недели</div>
+          <div class="report-date">Пн 21 апр</div>
+          <div class="report-modes"><span class="mode-badge mb-full">Полный · 58 сек</span></div>
+          <span class="badge b-green" style="margin:0 8px">Готов</span>
+          <button class="btn-sm">PDF</button>
+        </div>
+        <div class="report-row">
+          <div class="report-name">Анализ воронки конверсии</div>
+          <div class="report-date">Пн 14 апр</div>
+          <div class="report-modes"><span class="mode-badge mb-full">Полный · 62 сек</span></div>
+          <span class="badge b-green" style="margin:0 8px">Готов</span>
+          <button class="btn-sm">PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- РЕЖИМЫ ЗАПУСКА -->
+<div class="section">
+  <div class="section-label">
+    Два режима повторного запуска — система выбирает автоматически
+    <span class="badge b-gray">Технический принцип</span>
+  </div>
+  <div class="mock">
+    <div class="mock-header">
+      <div class="dot-row"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div></div>
+      Как работает повторный запуск шаблона
+    </div>
+    <div class="mock-body">
+      <div class="modes-compare">
+        <div class="mode-card mode-card-fast">
+          <div class="mode-title mode-title-fast">Быстрый режим</div>
+          <div class="mode-desc">Структура данных не изменилась. Система запускает сохранённый Python скрипт напрямую через E2B — без участия AI модели.</div>
+          <div class="mode-stat">Скорость: <span>~5 секунд</span></div>
+          <div class="mode-stat">Стоимость: <span>E2B только</span></div>
+          <div class="mode-stat">Когда: <span>регулярные отчёты</span></div>
+          <div class="auto-badge">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v4l2.5 1.5" stroke="#555" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="5" r="4" stroke="#555" stroke-width="1"/></svg>
+            Выбирается автоматически
+          </div>
+        </div>
+        <div class="mode-card mode-card-full">
+          <div class="mode-title mode-title-full">Полный режим</div>
+          <div class="mode-desc">Структура данных изменилась или запрос требует новой интерпретации. Kimi K2.6 строит анализ заново через 10 итераций.</div>
+          <div class="mode-stat">Скорость: <span>~60 секунд</span></div>
+          <div class="mode-stat">Стоимость: <span>Kimi K2.6 + E2B</span></div>
+          <div class="mode-stat">Когда: <span>новые данные или структура</span></div>
+          <div class="auto-badge">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v4l2.5 1.5" stroke="#555" stroke-width="1.2" stroke-linecap="round"/><circle cx="5" cy="5" r="4" stroke="#555" stroke-width="1"/></svg>
+            Выбирается автоматически
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:8px 12px;background:#F8F8F8;border-radius:8px;font-size:11px;color:#666;text-align:center">
+        Пользователь нажимает одну кнопку "Запустить" — система сама определяет режим на основе сравнения схемы данных
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
