@@ -1,97 +1,121 @@
-import { AnalysisOrchestrator } from "./orchestrator";
-
-export { AnalysisOrchestrator };
+import { AnalysisOrchestrator } from './orchestrator';
 
 export interface Env {
   ORCHESTRATOR: DurableObjectNamespace;
   KV: KVNamespace;
-  E2B_API_KEY: string;
-  DEEPINFRA_API_KEY: string;
   CLAUDE_API_KEY: string;
+  KIMI_API_KEY: string;
+  E2B_API_KEY: string;
   MAX_ITERATIONS: string;
 }
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function corsJson(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: CORS });
-}
+export { AnalysisOrchestrator };
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: CORS });
-    }
-
     const url = new URL(request.url);
+    const cors = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
 
-    if (url.pathname === "/health") {
-      return corsJson({ ok: true, version: "1.0.0", timestamp: Date.now() });
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: cors });
     }
 
-    if (url.pathname === "/analyze" && request.method === "POST") {
+    // POST /analyze — запуск анализа
+    if (request.method === 'POST' && url.pathname === '/analyze') {
       try {
-        const body = await request.json() as {
-          question?: string;
-          csvContent?: string;
-          userId?: string;
-          maxIterations?: number;
-          language?: "ru" | "en";
-        };
+        const body: any = await request.json();
+        const { question, csvContent, userId, language } = body;
 
-        if (!body.question || !body.csvContent) {
-          return corsJson({ error: "Missing required fields: question, csvContent" }, 400);
+        if (!question || !csvContent || !userId) {
+          return new Response(JSON.stringify({ error: 'Missing required fields: question, csvContent, userId' }), {
+            status: 400,
+            headers: { ...cors, 'Content-Type': 'application/json' },
+          });
         }
 
         const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const userId = body.userId || "anonymous";
 
-        const doId = env.ORCHESTRATOR.idFromName(userId);
-        const stub = env.ORCHESTRATOR.get(doId);
+        // Сохранить начальный статус в KV
+        await env.KV.put(`session:${sessionId}`, JSON.stringify({
+          status: 'processing',
+          question,
+          userId,
+          language: language || 'en',
+          startedAt: Date.now(),
+        }), { expirationTtl: 3600 });
 
-        const doResp = await stub.fetch(new Request("https://do/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId,
-            question: body.question,
-            csvContent: body.csvContent,
+        // Запустить Durable Object
+        const id = env.ORCHESTRATOR.idFromName(sessionId);
+        const stub = env.ORCHESTRATOR.get(id);
+
+        // Запускаем анализ асинхронно
+        const analyzeRequest = new Request('https://internal/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, question, csvContent, userId, language: language || 'en' }),
+        });
+
+        // Не ждём завершения — возвращаем sessionId сразу
+        stub.fetch(analyzeRequest).then(async (res) => {
+          const result = await res.json() as any;
+          await env.KV.put(`session:${sessionId}`, JSON.stringify({
+            status: 'completed',
+            question,
             userId,
-            maxIterations: body.maxIterations || parseInt(env.MAX_ITERATIONS),
-            language: body.language || "ru",
-          }),
-        }));
+            language: language || 'en',
+            result,
+            completedAt: Date.now(),
+          }), { expirationTtl: 86400 });
+        }).catch(async (err) => {
+          await env.KV.put(`session:${sessionId}`, JSON.stringify({
+            status: 'error',
+            error: err.message,
+          }), { expirationTtl: 3600 });
+        });
 
-        return corsJson(await doResp.json());
+        return new Response(JSON.stringify({ sessionId, status: 'started' }), {
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
 
-      } catch (err) {
-        return corsJson({ error: err instanceof Error ? err.message : String(err) }, 500);
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
       }
     }
 
-    if (url.pathname === "/status" && request.method === "GET") {
-      try {
-        const sessionId = url.searchParams.get("sessionId");
-        const userId = url.searchParams.get("userId") || "anonymous";
-        if (!sessionId) return corsJson({ error: "Missing sessionId" }, 400);
+    // GET /status/:sessionId — получить результат
+    if (request.method === 'GET' && url.pathname.startsWith('/status/')) {
+      const sessionId = url.pathname.replace('/status/', '');
 
-        const doId = env.ORCHESTRATOR.idFromName(userId);
-        const stub = env.ORCHESTRATOR.get(doId);
-
-        const doResp = await stub.fetch(
-          new Request(`https://do/status?sessionId=${sessionId}`)
-        );
-        return corsJson(await doResp.json());
-
-      } catch (err) {
-        return corsJson({ error: err instanceof Error ? err.message : String(err) }, 500);
+      const raw = await env.KV.get(`session:${sessionId}`);
+      if (!raw) {
+        return new Response(JSON.stringify({ error: 'Session not found' }), {
+          status: 404,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
       }
+
+      return new Response(raw, {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
 
-    return corsJson({ error: "Not found" }, 404);
+    // GET /health
+    if (url.pathname === '/health') {
+      return new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Not found' }), {
+      status: 404,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
   },
 };
