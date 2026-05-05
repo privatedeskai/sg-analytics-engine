@@ -56,7 +56,6 @@ export class AnalysisOrchestrator implements DurableObject {
 
     if (url.pathname === "/analyze" && request.method === "POST") {
       const body = await request.json() as AnalysisRequest;
-      // Запускаем анализ через waitUntil чтобы DO жил до завершения
       this.state.waitUntil(this.runAnalysis(body));
       return Response.json({ sessionId: body.sessionId, status: "started" });
     }
@@ -65,7 +64,6 @@ export class AnalysisOrchestrator implements DurableObject {
   }
 
   private async saveStatus(status: SessionStatus): Promise<void> {
-    // Пишем в KV — чтобы index.ts мог читать через /result
     try {
       await this.env.KV.put(
         `session:${status.sessionId}`,
@@ -85,10 +83,23 @@ export class AnalysisOrchestrator implements DurableObject {
     return `Forming conclusions and recommendations... (${pct}%)`;
   }
 
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms)
+      ),
+    ]);
+  }
+
   private async runAnalysis(req: AnalysisRequest): Promise<void> {
     const startTime = Date.now();
-    const maxIter = req.maxIterations || 3;
+    // MAX 3 итерации по умолчанию — оптимальный баланс скорость/качество
+    // Durable Object CPU limit: не более 30 сек на бесплатном плане
+    const maxIter = Math.min(req.maxIterations || 3, 3);
     const { sessionId, question, csvContent, language = "en" } = req;
+
+    console.log(`[${sessionId}] Starting analysis, maxIter=${maxIter}`);
 
     const e2b = new E2BClient(this.env.E2B_API_KEY);
     const kimi = new KimiClient(this.env.CLAUDE_API_KEY);
@@ -101,15 +112,15 @@ export class AnalysisOrchestrator implements DurableObject {
     try {
       await this.saveStatus({
         sessionId, iteration: 0, total: maxIter,
-        message: "Initializing sandbox...", status: "running",
+        message: "Initializing...", status: "running",
         startedAt: new Date().toISOString(), question,
       });
 
       const sandboxId = await e2b.createSandbox(180000);
-      await e2b.installPackages(sandboxId, ["pandas", "numpy", "matplotlib"]);
       await e2b.uploadCSV(sandboxId, csvContent);
 
-      // Получаем схему данных
+      // Схема данных — с таймаутом 10 сек
+      console.log(`[${sessionId}] Getting schema...`);
       const schemaCode = [
         "import pandas as pd, json, io",
         "df = pd.read_csv(io.StringIO(CSV_DATA))",
@@ -118,41 +129,55 @@ export class AnalysisOrchestrator implements DurableObject {
         "print(json.dumps({'schema': info, 'sample': sample}))",
       ].join("\n");
 
-      const schemaRun = await e2b.runCode(sandboxId, schemaCode);
+      const schemaRun = await this.withTimeout(
+        e2b.runCode(sandboxId, schemaCode),
+        15000, "schema detection"
+      );
 
-      let dataDescription = `CSV data with columns: ${csvContent.split('\n')[0]}`;
+      let dataDescription = `CSV columns: ${csvContent.split('\n')[0]}`;
       try {
         const parsed = JSON.parse(schemaRun.stdout) as any;
-        dataDescription = `Schema: ${JSON.stringify(parsed.schema)}\nSample rows: ${JSON.stringify(parsed.sample)}`;
-      } catch { /* use default */ }
+        dataDescription = `Schema: ${JSON.stringify(parsed.schema)}\nSample: ${JSON.stringify(parsed.sample)}`;
+        console.log(`[${sessionId}] Schema OK: ${dataDescription.slice(0, 100)}`);
+      } catch {
+        console.log(`[${sessionId}] Schema parse failed, using default. stdout: ${schemaRun.stdout.slice(0, 200)}`);
+      }
 
       const executionOutputs: string[] = [];
 
       for (let i = 1; i <= maxIter; i++) {
+        console.log(`[${sessionId}] Iteration ${i}/${maxIter} start`);
         await this.saveStatus({
           sessionId, iteration: i, total: maxIter,
           message: this.getIterationMessage(i, maxIter), status: "running", question,
         });
 
+        // Генерация Python — таймаут 20 сек
         let pythonCode = "";
         try {
           const prevResult = executionOutputs.length > 0 ? executionOutputs[executionOutputs.length - 1] : undefined;
-          pythonCode = await kimi.generatePython(dataDescription, question, prevResult, i);
+          pythonCode = await this.withTimeout(
+            kimi.generatePython(dataDescription, question, prevResult, i),
+            20000, `kimi iteration ${i}`
+          );
+          console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.length} chars)`);
         } catch (err) {
-          console.error(`Kimi error iter ${i}:`, err);
-          await this.saveStatus({
-            sessionId, iteration: i, total: maxIter,
-            message: `AI error on iteration ${i}: ${String(err)}`, status: "error",
-            error: String(err), question,
-          });
+          console.error(`[${sessionId}] Kimi error iter ${i}:`, err);
+          executionOutputs.push(`Kimi error: ${String(err)}`);
           break;
         }
 
+        // Выполнение Python — таймаут 15 сек
         let execResult: any;
         try {
-          execResult = await e2b.runCode(sandboxId, pythonCode);
+          execResult = await this.withTimeout(
+            e2b.runCode(sandboxId, pythonCode),
+            15000, `e2b iteration ${i}`
+          );
+          console.log(`[${sessionId}] Iter ${i}: Executed, stdout=${execResult.stdout.slice(0, 100)}, error=${execResult.error}`);
         } catch (err) {
           execResult = { stdout: "", stderr: String(err), error: String(err), executionTime: 0 };
+          console.error(`[${sessionId}] E2B timeout iter ${i}:`, err);
         }
 
         const output = execResult.error
@@ -167,13 +192,26 @@ export class AnalysisOrchestrator implements DurableObject {
         if (parsed.charts.length > 0) result.charts = parsed.charts;
       }
 
+      // Финальный summary — таймаут 25 сек
+      console.log(`[${sessionId}] Generating final summary...`);
       await this.saveStatus({
         sessionId, iteration: maxIter, total: maxIter,
         message: "Generating final summary...", status: "running", question,
       });
 
-      result.summary = await kimi.generateFinalAnalysis(question, executionOutputs, language);
+      try {
+        result.summary = await this.withTimeout(
+          kimi.generateFinalAnalysis(question, executionOutputs, language),
+          25000, "final summary"
+        );
+        console.log(`[${sessionId}] Summary OK (${result.summary.length} chars)`);
+      } catch (err) {
+        console.error(`[${sessionId}] Summary timeout:`, err);
+        result.summary = `Analysis completed in ${maxIter} iterations. ${executionOutputs[executionOutputs.length - 1]?.slice(0, 500) || "No output"}`;
+      }
+
       result.durationMs = Date.now() - startTime;
+      console.log(`[${sessionId}] COMPLETED in ${result.durationMs}ms`);
 
       await this.saveStatus({
         sessionId, iteration: maxIter, total: maxIter,
@@ -183,6 +221,7 @@ export class AnalysisOrchestrator implements DurableObject {
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[${sessionId}] FATAL ERROR:`, errMsg);
       result.error = errMsg;
       result.durationMs = Date.now() - startTime;
       await this.saveStatus({

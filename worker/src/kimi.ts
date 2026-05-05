@@ -16,9 +16,9 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    // Временно: Claude API. После пополнения DeepInfra — сменить на:
-    // baseUrl: 'https://api.deepinfra.com/v1/openai'
-    // model: 'moonshotai/Kimi-K2-Instruct'
+    // TODO_TEMP TD-001: временно Claude API вместо Kimi K2.6
+    // ВЕРНУТЬ: baseUrl = 'https://api.deepinfra.com/v1/openai', model = 'moonshotai/Kimi-K2-Instruct'
+    // ТРИГГЕР: пополнить баланс DeepInfra (~$10), проверить DEEPINFRA_API_KEY в Cloudflare secrets
     this.baseUrl = 'https://api.anthropic.com/v1';
     this.model = 'claude-sonnet-4-5';
   }
@@ -39,7 +39,6 @@ Return ONLY the Python code, no explanations, no markdown fences.`;
     return this.extractCode(response);
   }
 
-  // Alias for backward compatibility with orchestrator.ts
   async generateFinalAnalysis(question: string, analysisResults: string[], language: string = 'en'): Promise<string> {
     return this.generateFinalText(question, analysisResults, language);
   }

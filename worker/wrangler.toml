@@ -1,4 +1,4 @@
-﻿name = "sg-analytics-engine"
+name = "sg-analytics-engine"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -17,4 +17,6 @@ binding = "KV"
 id = "5884f641df3441deb36344e8be2e5ab6"
 
 [vars]
-MAX_ITERATIONS = "10"
+# TODO_TEMP TD-002: снижено с 10 до 3 для отладки таймаутов
+# ВЕРНУТЬ: MAX_ITERATIONS = "10" после 3 успешных тестов подряд
+MAX_ITERATIONS = "3"
