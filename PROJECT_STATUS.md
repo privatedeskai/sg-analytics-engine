@@ -40,7 +40,7 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 | Worker деплой | ✅ | https://sg-analytics-engine.dorofeevov17.workers.dev |
 | E2B клиент | ✅ | worker/src/e2b.ts |
 | Kimi K2.6 клиент | ✅ | worker/src/kimi.ts |
-| Оркестратор | ✅ | worker/src/orchestrator.ts — итерационный цикл |
+| Оркестратор | ✅ | worker/src/orchestrator.ts |
 | Secrets | ✅ | E2B_API_KEY, DEEPINFRA_API_KEY, CLAUDE_API_KEY |
 | KV namespace | ✅ | id: 5884f641df3441deb36344e8be2e5ab6 |
 | CSV загрузчик | ⬜ | День 2 |
@@ -60,7 +60,7 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 ---
 
 ## Следующие задачи (по приоритету)
-1. День 2: протестировать E2B sandbox — отправить тестовый CSV через /analyze
+1. День 2: тест /analyze с реальным CSV
 2. День 2: CSV коннектор — парсинг, нормализация, валидация
 3. День 3: базовый UI (чат + дашборд) на Vercel
 
@@ -74,15 +74,15 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 ### Сессия 1 — 2026-05-05
 **Сделано:**
 - Создана структура репозитория
-- Написан E2B клиент (createSandbox, runCode, uploadCSV, downloadFile)
-- Написан Kimi K2.6 клиент (planAnalysis, iterate, finalSummary)
-- Написан оркестратор итерационного цикла (Durable Object, 10 итераций)
-- Написан main Worker (CORS, /health, /analyze, /status)
-- Добавлены все secrets в Cloudflare
-- Создан KV namespace
-- Worker задеплоен и отвечает на /health
+- E2B клиент: createSandbox, runCode, uploadCSV, downloadFile
+- Kimi K2.6 клиент: planAnalysis, iterate, finalSummary
+- Оркестратор: Durable Object, итерационный цикл до 10 шагов
+- Main Worker: CORS, /health, /analyze, /status
+- Все secrets добавлены в Cloudflare
+- KV namespace создан
+- Worker задеплоен ✅
 
 **Следующая сессия — День 2:**
 1. Тест /analyze с реальным CSV
 2. CSV коннектор с валидацией
-3. Исправить E2B API endpoint если нужно (проверить реальную документацию e2b.dev)
+3. Проверить реальный E2B API endpoint по документации
