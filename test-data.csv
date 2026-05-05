@@ -1,0 +1,16 @@
+﻿date,product,category,revenue,units,cost
+2026-01-06,Laptop Pro,Electronics,1200,3,800
+2026-01-06,Mouse,Accessories,25,15,10
+2026-01-06,Keyboard,Accessories,75,8,30
+2026-01-07,Laptop Pro,Electronics,1200,2,800
+2026-01-07,Monitor,Electronics,450,4,280
+2026-01-07,Mouse,Accessories,25,20,10
+2026-01-08,Laptop Pro,Electronics,1200,5,800
+2026-01-08,Keyboard,Accessories,75,6,30
+2026-01-08,Headphones,Accessories,120,10,60
+2026-01-09,Monitor,Electronics,450,2,280
+2026-01-09,Mouse,Accessories,25,30,10
+2026-01-09,Laptop Pro,Electronics,1200,1,800
+2026-01-10,Headphones,Accessories,120,15,60
+2026-01-10,Keyboard,Accessories,75,12,30
+2026-01-10,Monitor,Electronics,450,6,280
