@@ -1,0 +1,20 @@
+﻿name = "sg-analytics-engine"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "ORCHESTRATOR", class_name = "AnalysisOrchestrator" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AnalysisOrchestrator"]
+
+[[kv_namespaces]]
+binding = "KV"
+id = "5884f641df3441deb36344e8be2e5ab6"
+
+[vars]
+MAX_ITERATIONS = "10"
