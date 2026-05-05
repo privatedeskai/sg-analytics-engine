@@ -16,8 +16,10 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    // DeepInfra (US серверы) — основной провайдер
+    // Временно: Claude API как fallback пока нет баланса DeepInfra
     this.baseUrl = "https://api.anthropic.com/v1";
-    this.model = "claude-sonnet-4-20250514";
+    this.model = "claude-sonnet-4-6";
   }
 
   async generatePython(
@@ -38,8 +40,8 @@ RULES:
 
     const userPrompt =
       iteration === 1
-        ? `Data description: ${dataDescription}\n\nQuestion: ${question}\n\nWrite Python code to analyze this data and answer the question.`
-        : `Previous iteration result:\n${previousResult}\n\nOriginal question: ${question}\n\nIteration ${iteration}: Improve the analysis. Look for deeper patterns or insights missed previously.`;
+        ? `Data description: ${dataDescription}\n\nQuestion: ${question}\n\nWrite Python code to analyze this data and answer the question. Include statistical analysis and create a chart if relevant.`
+        : `Previous iteration result:\n${previousResult}\n\nOriginal question: ${question}\n\nIteration ${iteration}: Improve the analysis. Look for deeper patterns, anomalies, or insights missed previously.`;
 
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
@@ -58,11 +60,13 @@ RULES:
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`API error: ${response.status} — ${err}`);
+      throw new Error(`Kimi/Claude API error: ${response.status} — ${err}`);
     }
 
     const data = (await response.json()) as any;
     const text = data.content?.[0]?.text || "";
+
+    // Извлекаем Python код из блока ```python ... ```
     const match = text.match(/```python\n([\s\S]*?)```/);
     return match ? match[1].trim() : text;
   }
@@ -99,10 +103,17 @@ RULES:
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Final analysis error: ${response.status} — ${err}`);
+      throw new Error(`Final analysis API error: ${response.status} — ${err}`);
     }
 
     const data = (await response.json()) as any;
     return data.content?.[0]?.text || "Analysis complete.";
   }
+
+  // Переключение на DeepInfra после пополнения баланса:
+  // 1. this.baseUrl = "https://api.deepinfra.com/v1/openai"
+  // 2. this.model = "moonshotai/Kimi-K2-Instruct"
+  // 3. Заменить headers на: { "Authorization": `Bearer ${this.apiKey}`, "Content-Type": "application/json" }
+  // 4. Изменить body.model на this.model
+  // 5. Изменить KIMI_API_KEY secret на DeepInfra ключ
 }
