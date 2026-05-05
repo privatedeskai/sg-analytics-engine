@@ -1,30 +1,32 @@
 # SG Analytics Engine — Статус проекта
 **Этап:** Э1 — Универсальный CSV Analyst
 **Обновлено:** 2026-05-05
-**Сессия:** 4
+**Сессия:** 5
 
 ---
 
 ## Репозиторий
-- GitHub: https://github.com/privatedeskai/sg-analytics-engine
-- Папка: C:\Users\dorof\Documents\sg-analytics-engine
-- Ветка: main
-
----
-
-## КРИТИЧНО — Команды запуска и деплоя
-
-cd C:\Users\dorof\Documents\sg-analytics-engine\worker
-npx wrangler deploy
-cd web-app ; npx vercel --prod --yes ; cd ..
-git add . ; git commit -m "checkpoint: [описание]" ; git push
+```
+GitHub: https://github.com/privatedeskai/sg-analytics-engine
+Папка:  C:\Users\dorof\Documents\sg-analytics-engine
+Ветка:  main
+```
 
 ---
 
 ## Живые URL
-
-Worker: https://sg-analytics-engine.dorofeevov17.workers.dev
+```
+Worker:  https://sg-analytics-engine.dorofeevov17.workers.dev
 Web App: https://web-app-liart-gamma.vercel.app
+```
+
+---
+
+## Команды запуска и деплоя
+```powershell
+cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
+cd C:\Users\dorof\Documents\sg-analytics-engine ; git add . ; git commit -m "checkpoint: [описание]" ; git push
+```
 
 ---
 
@@ -33,38 +35,62 @@ Web App: https://web-app-liart-gamma.vercel.app
 | Компонент | Статус | Комментарий |
 |-----------|--------|-------------|
 | Репозиторий | ✅ | github.com/privatedeskai/sg-analytics-engine |
-| Worker деплой | ✅ | задеплоен, отвечает на /analyze |
-| E2B клиент | ✅ | Piston API — работает |
-| kimi.ts | ✅ | починен, Claude API временно |
-| index.ts | ⚠️ | роут /status написан но НЕ задеплоен |
-| Оркестратор | ✅ | orchestrator.ts работает |
-| Secrets | ✅ | E2B_API_KEY, DEEPINFRA_API_KEY, CLAUDE_API_KEY |
-| KV namespace | ✅ | id: 5884f641df3441deb36344e8be2e5ab6 |
-| CSV загрузчик | ⬜ | не начат |
-| Output formatter | ⬜ | не начат |
+| Worker деплой | ✅ | отвечает на /status, /analyze, /result/:id |
+| /status роут | ✅ | возвращает 200 OK |
+| /analyze роут | ✅ | запускает анализ, возвращает sessionId |
+| /result роут | ✅ | читает из KV, сессия не теряется |
+| KV хранилище | ✅ | статус сессий пишется и читается корректно |
+| Оркестратор | ✅ | AnalysisOrchestrator, 3 итерации (TD-002) |
+| Judge0 CE | ✅ | ce.judge0.com, без ключа, execution работает |
+| kimi.ts | ✅ | claude-sonnet-4-5 временно (TD-001) |
+| CSV загрузчик | ✅ | connectors/csv.ts готов |
+| Output formatter | ✅ | output.ts готов |
+| Secrets | ✅ | CLAUDE_API_KEY, DEEPINFRA_API_KEY, E2B_API_KEY |
+| MCP filesystem | ✅ | работает, Claude пишет файлы напрямую |
 | Базовый UI | ⬜ | не начат |
 | Stripe биллинг | ⬜ | не начат |
-| MCP терминал | ⚠️ | конфиг обновлён на server-filesystem, требует перезапуска |
 
 ---
 
-## КРИТИЧНО — Первые шаги сессии 5
+## Активные технические долги
 
-### Задача 1: проверить MCP filesystem
-После перезапуска Claude Desktop проверить подключился ли MCP server-filesystem.
+| ID | Описание | Триггер возврата |
+|----|----------|-----------------|
+| TD-001 | Claude API вместо Kimi K2.6 | Пополнить DeepInfra ~$10 |
+| TD-002 | MAX_ITERATIONS=3 вместо 10 | 3 успешных теста подряд |
+| TD-003 | Жёсткие таймауты в orchestrator.ts | Оценить после стабилизации |
 
-### Задача 2: задеплоить index.ts с роутом /status
-Открыть и заменить файл:
-https://github.com/privatedeskai/sg-analytics-engine/blob/main/worker/src/index.ts
+Подробности — в TECH_DEBT.md
 
-Код index.ts с роутом /status — Claude восстановит в начале сессии 5.
+---
 
-После коммита:
-cd C:\Users\dorof\Documents\sg-analytics-engine ; git pull
-cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
+## КРИТИЧНО — Первые шаги сессии 6
 
-### Задача 3: CSV загрузчик
-После успешного теста /status — начать csv.ts
+### Задача 1: завершить тест pipeline
+Запустить анализ и получить `"status":"completed"` с непустым `result.summary`.
+Оставить окно с `wrangler tail` открытым для логов DO.
+
+```powershell
+# Мониторинг логов (первое окно)
+cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler tail --format pretty
+```
+
+```powershell
+# Тест (второе окно)
+$r = Invoke-WebRequest -Method POST https://sg-analytics-engine.dorofeevov17.workers.dev/analyze -ContentType "application/json" -Body '{"question":"What are the top 3 products by revenue?","csvContent":"product,revenue,units\nApples,1200,100\nBananas,850,200\nCarrots,2100,50\nDates,430,30\nEggplant,1750,80"}' -UseBasicParsing ; $sid = ($r.Content | ConvertFrom-Json).sessionId ; Write-Host "SessionId: $sid"
+```
+
+```powershell
+# Проверка результата через 30 сек
+Invoke-WebRequest "https://sg-analytics-engine.dorofeevov17.workers.dev/result/$sid" -UseBasicParsing | Select-Object -ExpandProperty Content
+```
+
+### Задача 2: после успешного теста — закрыть TD-002
+Вернуть MAX_ITERATIONS = "10" в wrangler.toml и убрать Math.min cap в orchestrator.ts.
+
+### Задача 3: базовый UI
+Написать web-app/index.html — чат слева, дашборд справа.
+Задеплоить на Vercel.
 
 ---
 
@@ -77,20 +103,27 @@ cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
 Worker задеплоен, все secrets добавлены, файлы созданы.
 
 ### Сессия 2 — 2026-05-05
-- Добавлен .gitignore для node_modules
-- E2B переключён на Piston API
+- E2B SDK несовместим с CF Workers — переключились на Piston API
 - Claude API подключён временно вместо Kimi
-- kimi.ts содержал синтаксическую ошибку
 
 ### Сессия 3 — 2026-05-05
-- PROJECT_INSTRUCTIONS.md обновлён — добавлено ПРАВИЛО 5 (URL только в блоках кода)
-- kimi.ts починен — синтаксическая ошибка устранена
-- Worker успешно задеплоен
-- /analyze отвечает — возвращает sessionId
-- /status роут написан но не задеплоен — первая задача сессии 4
+- kimi.ts починен
+- Worker задеплоен, /analyze отвечает
 
 ### Сессия 4 — 2026-05-05
-- MCP конфиг обновлён на @modelcontextprotocol/server-filesystem
-- Конфиг находится в AppData\Roaming\Claude\claude_desktop_config.json
-- index.ts с роутом /status всё ещё не задеплоен
-- После перезапуска Desktop — проверить MCP и задеплоить index.ts
+- MCP filesystem подключён и работает
+- Claude теперь пишет файлы напрямую через filesystem
+
+### Сессия 5 — 2026-05-05
+- Подключён MCP filesystem — Claude пишет файлы сам без участия Олега
+- Исправлен экспорт AnalysisOrchestrator (было Orchestrator)
+- Исправлен KV binding (было ANALYTICS_KV, стало KV)
+- /status роут задеплоен и работает (200 OK)
+- /result читает из KV — сессия больше не теряется
+- Piston API заменён на Judge0 CE (ce.judge0.com) — без ключа, без карты
+- Добавлены таймауты в orchestrator.ts (withTimeout)
+- MAX_ITERATIONS снижен до 3 для отладки (TD-002)
+- Pipeline работает: started → running (iter 1..10) — финальный completed в процессе отладки
+- Создан TECH_DEBT.md — реестр временных решений
+- Обновлён PROJECT_INSTRUCTIONS.md — регламент технического долга (раздел 14)
+- Добавлен регламент выбора внешних решений (раздел 13)
