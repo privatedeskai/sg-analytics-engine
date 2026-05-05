@@ -79,3 +79,17 @@
 - Решает compliance для US/CA рынка
 
 **Fallback:** Claude API если DeepInfra нестабилен — замена одной строки в конфиге
+
+## 2026-05-05 — Временное переключение на Claude API для отладки
+
+**Решение:** Временно использовать Claude API вместо Kimi K2.6 (DeepInfra) для прохождения end-to-end теста
+
+**Причина:** Нулевой баланс на DeepInfra аккаунте. Пополнить баланс на deepinfra.com (~$10).
+
+**ВАЖНО — ВЕРНУТЬ ПОСЛЕ ОТЛАДКИ:**
+- Пополнить баланс на https://deepinfra.com → Billing
+- В kimi.ts изменить baseUrl обратно на DeepInfra и модель на Kimi K2.6
+- Проверить что DEEPINFRA_API_KEY актуален в Cloudflare secrets
+
+**Альтернативы отклонены:**
+- Остаться на Claude API навсегда — в 20 раз дороже при масштабе
