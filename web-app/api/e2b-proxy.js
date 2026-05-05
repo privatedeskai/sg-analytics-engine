@@ -1,6 +1,6 @@
-const { Sandbox } = require("@e2b/code-interpreter");
+import { Sandbox } from "@e2b/code-interpreter";
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: "Missing code" });
@@ -18,4 +18,4 @@ module.exports = async function handler(req, res) {
   } finally {
     if (sandbox) await sandbox.kill().catch(() => {});
   }
-};
+}
