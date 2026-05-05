@@ -1,6 +1,9 @@
 {
   "name": "sg-analytics-web",
   "version": "1.0.0",
+  "scripts": {
+    "build": "echo 'build ok'"
+  },
   "dependencies": {
     "@e2b/code-interpreter": "^2.4.2"
   }
