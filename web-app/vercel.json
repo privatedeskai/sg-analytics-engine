@@ -1,7 +1,6 @@
 {
   "functions": {
     "api/e2b-proxy.js": {
-      "runtime": "nodejs20.x",
       "maxDuration": 60
     }
   }
