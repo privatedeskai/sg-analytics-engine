@@ -8,7 +8,7 @@ export interface KimiResponse {
   iterations: number;
   pythonCode?: string;
 }
-
+ 
 export class KimiClient {
   private apiKey: string;
   private baseUrl: string;
