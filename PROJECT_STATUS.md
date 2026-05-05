@@ -1,12 +1,12 @@
 # SG Analytics Engine — Статус проекта
 **Этап:** Э1 — Универсальный CSV Analyst
-**Обновлено:** 2026-05-04
-**Сессия:** 0 (инициализация)
+**Обновлено:** 2026-05-05
+**Сессия:** 1
 
 ---
 
 ## Репозиторий
-- GitHub: github.com/[username]/sg-analytics-engine
+- GitHub: github.com/privatedeskai/sg-analytics-engine
 - Папка: C:\Users\dorof\Documents\sg-analytics-engine
 - Ветка: main
 
@@ -15,25 +15,20 @@
 ## КРИТИЧНО — Команды запуска и деплоя
 
 ```powershell
-# Рабочий каталог
-cd C:\Users\dorof\Documents\sg-analytics-engine
+cd C:\Users\dorof\Documents\sg-analytics-engine\worker
 
-# Деплой Worker
 npx wrangler deploy
 
-# Деплой Web App
 cd web-app ; npx vercel --prod --yes ; cd ..
 
-# Checkpoint коммит
-git add . ; git commit -m "checkpoint: [описание]"
+git add . ; git commit -m "checkpoint: [описание]" ; git push
 ```
 
 ---
 
-## КРИТИЧНО — Правила работы с файлами
-- Все файлы через GitHub (карандаш → Ctrl+A → вставить → Commit)
-- НЕ писать через Node.js скрипты — ломает спецсимволы
-- После GitHub коммита: git pull
+## Живые URL
+- Worker: https://sg-analytics-engine.dorofeevov17.workers.dev
+- Web App: не задеплоен
 
 ---
 
@@ -41,49 +36,53 @@ git add . ; git commit -m "checkpoint: [описание]"
 
 | Компонент | Статус | Комментарий |
 |-----------|--------|-------------|
-| Репозиторий | ⬜ Не создан | Создать sg-analytics-engine |
-| E2B интеграция | ⬜ | Нужен API ключ |
-| Kimi K2.6 (Gonka AI) | ⬜ | Нужен API ключ |
-| Оркестратор итераций | ⬜ | |
-| CSV загрузчик | ⬜ | |
-| Output formatter | ⬜ | |
-| Базовый UI | ⬜ | |
-| Stripe биллинг | ⬜ | |
-| Деплой Vercel | ⬜ | |
+| Репозиторий | ✅ | github.com/privatedeskai/sg-analytics-engine |
+| Worker деплой | ✅ | https://sg-analytics-engine.dorofeevov17.workers.dev |
+| E2B клиент | ✅ | worker/src/e2b.ts |
+| Kimi K2.6 клиент | ✅ | worker/src/kimi.ts |
+| Оркестратор | ✅ | worker/src/orchestrator.ts — итерационный цикл |
+| Secrets | ✅ | E2B_API_KEY, DEEPINFRA_API_KEY, CLAUDE_API_KEY |
+| KV namespace | ✅ | id: 5884f641df3441deb36344e8be2e5ab6 |
+| CSV загрузчик | ⬜ | День 2 |
+| Output formatter | ⬜ | День 2 |
+| Базовый UI | ⬜ | День 3 |
+| Stripe биллинг | ⬜ | День 5 |
+| Деплой Vercel | ⬜ | День 3 |
 
 ---
 
-## Живые URL
-- Web App: [заполнить после деплоя]
-- Worker: [заполнить после деплоя]
-
----
-
-## API ключи (нужно получить)
-- [ ] E2B API key — e2b.dev
-- [ ] Kimi K2.6 key — Gonka AI или DeepInfra
-- [ ] Claude API key — уже есть из ScreenGuide
-- [ ] Stripe — уже есть из ScreenGuide
+## API ключи
+- [x] E2B API key — добавлен как secret
+- [x] Kimi K2.6 key (DeepInfra) — добавлен как secret
+- [x] Claude API key — добавлен как secret
+- [ ] Stripe — следующий этап
 
 ---
 
 ## Следующие задачи (по приоритету)
-1. Создать репозиторий sg-analytics-engine
-2. Получить E2B API ключ
-3. Получить Kimi K2.6 API ключ
-4. Начать День 1: E2B интеграция в Worker
+1. День 2: протестировать E2B sandbox — отправить тестовый CSV через /analyze
+2. День 2: CSV коннектор — парсинг, нормализация, валидация
+3. День 3: базовый UI (чат + дашборд) на Vercel
 
 ---
 
 ## История сессий
 
 ### Сессия 0 — 2026-05-04 (инициализация)
-**Сделано:**
-- Разработана концепция продукта
-- Выбран технический стек: Kimi K2.6 + E2B + Claude Vision
-- Создан PROJECT_INSTRUCTIONS.md
-- Создан PROJECT_STATUS.md
-- Создана инструкция по открытию проекта
+- Разработана концепция, выбран стек, созданы PROJECT_INSTRUCTIONS.md и PROJECT_STATUS.md
 
-**Следующая сессия:**
-- Начать с создания репозитория и Дня 1
+### Сессия 1 — 2026-05-05
+**Сделано:**
+- Создана структура репозитория
+- Написан E2B клиент (createSandbox, runCode, uploadCSV, downloadFile)
+- Написан Kimi K2.6 клиент (planAnalysis, iterate, finalSummary)
+- Написан оркестратор итерационного цикла (Durable Object, 10 итераций)
+- Написан main Worker (CORS, /health, /analyze, /status)
+- Добавлены все secrets в Cloudflare
+- Создан KV namespace
+- Worker задеплоен и отвечает на /health
+
+**Следующая сессия — День 2:**
+1. Тест /analyze с реальным CSV
+2. CSV коннектор с валидацией
+3. Исправить E2B API endpoint если нужно (проверить реальную документацию e2b.dev)
