@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "sg-analytics-engine-worker",
   "version": "1.0.0",
   "type": "module",
@@ -10,6 +10,10 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240725.0",
     "typescript": "^5.5.0",
-    "wrangler": "^3.65.0"
+    "wrangler": "^4.87.0"
+  },
+  "dependencies": {
+    "@e2b/code-interpreter": "^2.4.2",
+    "e2b": "^2.19.4"
   }
 }
