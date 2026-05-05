@@ -1,13 +1,14 @@
-import { Orchestrator } from './orchestrator';
+import { AnalysisOrchestrator } from './orchestrator';
 
-export { Orchestrator };
+export { AnalysisOrchestrator };
 
 export interface Env {
   CLAUDE_API_KEY: string;
   DEEPINFRA_API_KEY: string;
   E2B_API_KEY: string;
-  ANALYTICS_KV: KVNamespace;
+  KV: KVNamespace;
   ORCHESTRATOR: DurableObjectNamespace;
+  MAX_ITERATIONS: string;
 }
 
 const corsHeaders = {
@@ -24,7 +25,7 @@ export default {
 
     const url = new URL(request.url);
 
-    // GET /status — проверка состояния worker
+    // GET /status
     if (request.method === 'GET' && url.pathname === '/status') {
       return Response.json({
         status: 'ok',
@@ -34,7 +35,7 @@ export default {
         components: {
           worker: true,
           kv: true,
-          orchestrator: true,
+          orchestrator: 'AnalysisOrchestrator',
           e2b: 'piston-api',
           ai: 'claude-api-temp',
         },
@@ -42,7 +43,7 @@ export default {
       }, { headers: corsHeaders });
     }
 
-    // POST /analyze — запуск анализа
+    // POST /analyze
     if (request.method === 'POST' && url.pathname === '/analyze') {
       let body: any;
       try {
@@ -51,29 +52,31 @@ export default {
         return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: corsHeaders });
       }
 
-      const { question, data, sessionId: existingSession } = body;
+      const { question, data, csvContent, sessionId: existingSession, userId = 'anon' } = body;
 
       if (!question) {
         return Response.json({ error: 'Missing required field: question' }, { status: 400, headers: corsHeaders });
       }
 
       const sessionId = existingSession || crypto.randomUUID();
+      const maxIterations = parseInt(env.MAX_ITERATIONS || '3');
 
-      // Роутим в Durable Object Orchestrator
       const id = env.ORCHESTRATOR.idFromName(sessionId);
       const orchestrator = env.ORCHESTRATOR.get(id);
 
-      const orchestratorRequest = new Request('https://internal/run', {
+      const orchestratorRequest = new Request('https://internal/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, data, sessionId, env: {
-          CLAUDE_API_KEY: env.CLAUDE_API_KEY,
-          DEEPINFRA_API_KEY: env.DEEPINFRA_API_KEY,
-          E2B_API_KEY: env.E2B_API_KEY,
-        }}),
+        body: JSON.stringify({
+          sessionId,
+          question,
+          csvContent: csvContent || data || '',
+          userId,
+          maxIterations,
+          language: 'en',
+        }),
       });
 
-      // Запускаем асинхронно, возвращаем sessionId сразу
       orchestrator.fetch(orchestratorRequest).catch(() => {});
 
       return Response.json({
@@ -83,28 +86,29 @@ export default {
       }, { headers: corsHeaders });
     }
 
-    // GET /result/:sessionId — получение результата
+    // GET /result/:sessionId
     if (request.method === 'GET' && url.pathname.startsWith('/result/')) {
-      const sessionId = url.pathname.replace('/result/', '');
+      const sessionId = url.pathname.replace('/result/', '').split('?')[0];
       if (!sessionId) {
         return Response.json({ error: 'Missing sessionId' }, { status: 400, headers: corsHeaders });
       }
 
-      const result = await env.ANALYTICS_KV.get(`result:${sessionId}`);
-      const statusVal = await env.ANALYTICS_KV.get(`status:${sessionId}`);
+      const id = env.ORCHESTRATOR.idFromName(sessionId);
+      const orchestrator = env.ORCHESTRATOR.get(id);
 
-      if (!result && !statusVal) {
+      const statusRequest = new Request('https://internal/status?sessionId=' + sessionId, {
+        method: 'GET',
+      });
+
+      try {
+        const statusResponse = await orchestrator.fetch(statusRequest);
+        const statusData = await statusResponse.json();
+        return Response.json(statusData, { headers: corsHeaders });
+      } catch {
         return Response.json({ error: 'Session not found', sessionId }, { status: 404, headers: corsHeaders });
       }
-
-      return Response.json({
-        sessionId,
-        status: statusVal || 'unknown',
-        result: result ? JSON.parse(result) : null,
-      }, { headers: corsHeaders });
     }
 
-    // 404
     return Response.json({
       error: 'Not found',
       available_routes: ['GET /status', 'POST /analyze', 'GET /result/:sessionId'],
