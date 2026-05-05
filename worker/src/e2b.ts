@@ -1,6 +1,3 @@
-// E2B execution via Pyodide (Python in WebAssembly)
-// Runs Python code directly in Cloudflare Worker without external services
-
 export interface E2BResult {
   stdout: string;
   stderr: string;
@@ -10,49 +7,14 @@ export interface E2BResult {
 
 export class E2BClient {
   private apiKey: string;
+  private csvContent: string = '';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
-  async runPython(code: string): Promise<E2BResult> {
-    const start = Date.now();
-    try {
-      const resp = await fetch("https://emkc.org/api/v2/piston/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language: "python",
-          version: "3.10.0",
-          files: [{ content: code }],
-        }),
-      });
-      if (!resp.ok) throw new Error(`Piston execute failed: ${resp.status} ${await resp.text()}`);
-      const data = await resp.json() as {
-        run: { stdout: string; stderr: string; code: number; output: string };
-      };
-      return {
-        stdout: data.run.stdout || "",
-        stderr: data.run.stderr || "",
-        error: data.run.code !== 0 ? `Exit code ${data.run.code}: ${data.run.stderr}` : null,
-        executionTime: Date.now() - start,
-      };
-    } catch (err) {
-      return {
-        stdout: "",
-        stderr: String(err),
-        error: String(err),
-        executionTime: Date.now() - start,
-      };
-    }
-  }
-
   async createSandbox(_timeoutMs = 120000): Promise<string> {
-    return "piston-sandbox";
-  }
-
-  async runCode(_sandboxId: string, code: string): Promise<E2BResult> {
-    return this.runPython(code);
+    return 'piston-sandbox';
   }
 
   async installPackages(_sandboxId: string, _packages: string[]): Promise<void> {
@@ -60,15 +22,62 @@ export class E2BClient {
   }
 
   async uploadCSV(_sandboxId: string, csvContent: string): Promise<void> {
-    // Store CSV in memory - inject into code via global variable
-    (globalThis as unknown as Record<string, string>)["__csv_content__"] = csvContent;
+    // Store CSV — will be injected as CSV_DATA variable in each runCode call
+    this.csvContent = csvContent;
+  }
+
+  async runCode(_sandboxId: string, code: string): Promise<E2BResult> {
+    // Prepend CSV_DATA variable so all generated Python can access it
+    const csvEscaped = this.csvContent.replace(/\\/g, '\\\\').replace(/"""/g, '\\"\\"\\"');
+    const preamble = this.csvContent
+      ? `CSV_DATA = """${csvEscaped}"""\n\n`
+      : '';
+
+    return this.runPython(preamble + code);
+  }
+
+  async runPython(code: string): Promise<E2BResult> {
+    const start = Date.now();
+    try {
+      const resp = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: 'python',
+          version: '3.10.0',
+          files: [{ content: code }],
+        }),
+      });
+
+      if (!resp.ok) {
+        throw new Error(`Piston execute failed: ${resp.status} ${await resp.text()}`);
+      }
+
+      const data = await resp.json() as {
+        run: { stdout: string; stderr: string; code: number; output: string };
+      };
+
+      return {
+        stdout: data.run.stdout || '',
+        stderr: data.run.stderr || '',
+        error: data.run.code !== 0 ? `Exit code ${data.run.code}: ${data.run.stderr}` : null,
+        executionTime: Date.now() - start,
+      };
+    } catch (err) {
+      return {
+        stdout: '',
+        stderr: String(err),
+        error: String(err),
+        executionTime: Date.now() - start,
+      };
+    }
   }
 
   async downloadFile(_sandboxId: string, _path: string): Promise<string> {
-    return "";
+    return '';
   }
 
   async closeSandbox(_sandboxId: string): Promise<void> {
-    // no-op
+    // no-op for Piston
   }
 }

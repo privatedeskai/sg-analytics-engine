@@ -8,7 +8,7 @@ export interface KimiResponse {
   iterations: number;
   pythonCode?: string;
 }
- 
+
 export class KimiClient {
   private apiKey: string;
   private baseUrl: string;
@@ -23,17 +23,25 @@ export class KimiClient {
     this.model = 'claude-sonnet-4-20250514';
   }
 
-  async generatePython(dataDescription: string, question: string, previousResult?: string): Promise<string> {
+  async generatePython(dataDescription: string, question: string, previousResult?: string, iteration?: number): Promise<string> {
     const systemPrompt = `You are a Python data analyst. Write clean, executable Python code to analyze data and answer questions.
-Always use pandas for data manipulation. Always print results clearly.
+The CSV data is available as a string in the variable CSV_DATA (already defined before your code runs).
+Always start with: import pandas as pd, io; df = pd.read_csv(io.StringIO(CSV_DATA))
+Always use pandas for data manipulation. Always print results as JSON using: import json; print(json.dumps({...}))
 Return ONLY the Python code, no explanations, no markdown fences.`;
 
+    const iterNote = iteration ? ` (iteration ${iteration})` : '';
     const userMessage = previousResult
-      ? `Data: ${dataDescription}\nQuestion: ${question}\nPrevious result:\n${previousResult}\n\nImprove the analysis based on the previous result. Return only Python code.`
-      : `Data: ${dataDescription}\nQuestion: ${question}\n\nWrite Python code to analyze this data and answer the question. Return only Python code.`;
+      ? `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\nPrevious result:\n${previousResult}\n\nImprove the analysis. Focus on deeper insights. Return only Python code.`
+      : `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\n\nWrite Python code to analyze this data and answer the question. Return only Python code.`;
 
     const response = await this.callAPI(systemPrompt, userMessage);
     return this.extractCode(response);
+  }
+
+  // Alias for backward compatibility with orchestrator.ts
+  async generateFinalAnalysis(question: string, analysisResults: string[], language: string = 'en'): Promise<string> {
+    return this.generateFinalText(question, analysisResults, language);
   }
 
   async generateFinalText(question: string, analysisResults: string[], language: string = 'en'): Promise<string> {
