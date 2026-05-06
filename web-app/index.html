@@ -425,7 +425,8 @@ body::after {
 
 <script>
 const WORKER_URL = "https://sg-analytics-engine.dorofeevov17.workers.dev";
-// TD-001 CLOSED, TD-002 CLOSED: Kimi K2.6 on DeepInfra`r`nconst MAX_ITERATIONS = 10;
+// TD-001 CLOSED, TD-002 CLOSED: Kimi K2.6 on DeepInfra
+const MAX_ITERATIONS = 10;
 
 let csvContent = null, isAnalyzing = false, currentChart = null;
 
@@ -502,7 +503,7 @@ async function startAnalysis(question) {
     const r = await fetch(`${WORKER_URL}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // TD-001 CLOSED, TD-002 CLOSED`r`n      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: MAX_ITERATIONS, language: "ru" }),
+      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: MAX_ITERATIONS, language: "ru" }),
     });
     sessionId = (await r.json()).sessionId;
   } catch { delProg(); addMsg("err","Не удалось подключиться к серверу."); reset(); return; }
@@ -739,4 +740,5 @@ function fmtN(n) {
 </script>
 </body>
 </html>
+
 
