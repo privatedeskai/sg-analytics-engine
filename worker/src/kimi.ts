@@ -12,8 +12,10 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    // Vариант 4: Kimi K2.5 — нет thinking mode по умолчанию, быстрее K2.6
+    // Гипотеза: K2.6 таймаутит из-за thinking tokens, K2.5 должна отвечать быстро
     this.baseUrl = 'https://api.deepinfra.com/v1/openai';
-    this.model = 'moonshotai/Kimi-K2.6';
+    this.model = 'moonshotai/Kimi-K2.5';
   }
 
   async generateIteration(
@@ -26,7 +28,7 @@ export class KimiClient {
     const systemPrompt = `You are a Python data analyst working iteratively. Each iteration you:
 1. Write focused Python to test ONE specific hypothesis
 2. Summarize what you found in 1-2 sentences
-3. Decide if you have enough to answer the user's question
+3. Decide if you have enough to answer the user question
 
 CRITICAL CONSTRAINTS — Judge0 CE sandbox, Python stdlib only:
 - FORBIDDEN: pandas, numpy, matplotlib, scipy, sklearn, or ANY non-stdlib import
@@ -64,11 +66,11 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
 
     const userMessage = `Question: ${question}\n\nFindings from ${summaries.length} analysis iterations:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
 
-    return await this.callAPIStreaming(systemPrompt, userMessage, 1500);
+    return await this.callAPIStreaming(systemPrompt, userMessage, 1000);
   }
 
-  // Streaming fetch — reads response token by token, returns full text
-  // Required for large MoE models like Kimi K2.6 to avoid connection timeout
+  // Streaming — читаем токены по мере генерации
+  // Нужно для больших моделей чтобы не ждать весь ответ целиком
   private async callAPIStreaming(systemPrompt: string, userMessage: string, maxTokens: number): Promise<string> {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -80,11 +82,13 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
         model: this.model,
         max_tokens: maxTokens,
         stream: true,
+        // temperature=1.0 как рекомендует документация Kimi
+        temperature: 1.0,
+        top_p: 1.0,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.6,
       }),
     });
 
@@ -93,7 +97,6 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
       throw new Error(`Kimi API error ${response.status}: ${err}`);
     }
 
-    // Read SSE stream and accumulate content
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
@@ -111,13 +114,12 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
         const trimmed = line.trim();
         if (!trimmed || trimmed === 'data: [DONE]') continue;
         if (!trimmed.startsWith('data: ')) continue;
-
         try {
           const json = JSON.parse(trimmed.slice(6));
           const delta = json.choices?.[0]?.delta?.content;
           if (delta) fullContent += delta;
         } catch {
-          // Skip malformed SSE chunks
+          // пропускаем битые SSE чанки
         }
       }
     }
@@ -136,7 +138,7 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
         reason: parsed.reason || '',
       };
     } catch {
-      console.error('[KimiClient] Failed to parse iteration JSON, falling back to raw code');
+      console.error('[KimiClient] Failed to parse iteration JSON, falling back');
       return {
         python: this.extractCode(raw),
         summary: 'Iteration completed (parse fallback)',
