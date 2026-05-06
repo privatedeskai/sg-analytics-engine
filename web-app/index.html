@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,140 +10,140 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#F5F5F5;color:#222;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
 /* HEADER */
-.header{background:#fff;border-bottom:1px solid #E0E0E0;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.header-logo{font-size:15px;font-weight:600;color:#1A3A6B;letter-spacing:-0.01em}
-.header-logo span{color:#378ADD}
-.header-right{display:flex;align-items:center;gap:12px}
-.header-status{font-size:11px;color:#888}
-.header-badge{font-size:10px;padding:2px 8px;border-radius:4px;background:#EAF3DE;color:#27500A;font-weight:500}
+.page-header{background:#fff;border-bottom:1px solid #E0E0E0;padding:8px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.page-title{font-size:16px;font-weight:500;color:#1A3A6B}
+.page-sub{font-size:11px;color:#888}
+.header-badge{font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500;background:#EAF3DE;color:#27500A}
 
-/* MAIN LAYOUT */
+/* MAIN SPLIT */
 .main{display:flex;flex:1;overflow:hidden}
 
-/* CHAT PANEL */
-.chat-panel{width:40%;min-width:320px;background:#fff;border-right:1px solid #E0E0E0;display:flex;flex-direction:column}
-.panel-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.06em;padding:12px 14px 8px;border-bottom:1px solid #F0F0F0}
+/* CHAT PANEL — точно как .hybrid-chat в мокапе */
+.hybrid-chat{width:270px;flex-shrink:0;border-right:1px solid #EEEEEE;display:flex;flex-direction:column;padding:12px;gap:8px;background:#fff}
+.chat-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
 
 /* UPLOAD */
-.upload-zone{margin:10px 12px;border:1.5px dashed #D0D0D0;border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:#FAFAFA}
+.upload-zone{border:1.5px dashed #D0D0D0;border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:#FAFAFA}
 .upload-zone:hover,.upload-zone.drag-over{border-color:#378ADD;background:#EEF5FD}
 .upload-zone.has-file{border-color:#1D9E75;background:#F0FBF4}
-.upload-icon{font-size:18px;margin-bottom:3px}
-.upload-text{font-size:11px;color:#888}
-.upload-text strong{color:#378ADD}
-.upload-filename{font-size:11px;color:#1D9E75;font-weight:500;margin-top:2px}
+.upload-zone-text{font-size:10px;color:#888}
+.upload-zone-text strong{color:#378ADD}
+.upload-filename{font-size:10px;color:#1D9E75;font-weight:500;margin-top:2px}
 
-/* MESSAGES */
-.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
-.msg-user{background:#F0F0F0;border-radius:8px 8px 2px 8px;padding:7px 10px;font-size:11px;color:#222;align-self:flex-end;max-width:85%}
-.msg-ai{background:#E8F0FE;border-radius:8px 8px 8px 2px;padding:8px 10px;font-size:11px;color:#1A3A6B;border-left:2px solid #378ADD;line-height:1.55;max-width:96%}
-.msg-progress{display:flex;align-items:center;gap:7px;padding:7px 10px;background:#F8F8F8;border-radius:8px;font-size:10px;color:#555}
-.msg-error{background:#FEE8E8;border-left:2px solid #E24B4A;border-radius:8px;padding:8px 10px;font-size:11px;color:#A32D2D}
-.progress-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0;animation:pulse 1.4s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+/* MESSAGES — точно как .msgs */
+.msgs{display:flex;flex-direction:column;gap:6px;flex:1;overflow-y:auto}
 
-/* INPUT */
-.chat-input-area{padding:10px 12px;border-top:1px solid #F0F0F0;display:flex;flex-direction:column;gap:6px}
-.chat-input-row{display:flex;gap:6px;align-items:flex-end}
-.chat-input{flex:1;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-size:11px;font-family:inherit;resize:none;outline:none;min-height:36px;max-height:100px;transition:border-color 0.2s;color:#222;background:#fff}
-.chat-input:focus{border-color:#378ADD}
-.chat-input::placeholder{color:#BBB}
-.send-btn{width:36px;height:36px;border-radius:8px;background:#1A3A6B;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s}
+/* точно как в мокапе */
+.msg-user{background:#F0F0F0;border-radius:8px;padding:7px 10px;font-size:11px;color:#222;align-self:flex-end;max-width:85%}
+.msg-ai{background:#E8F0FE;border-radius:8px;padding:7px 10px;font-size:11px;color:#1A3A6B;border-left:2px solid #378ADD;line-height:1.5}
+.msg-error{background:#FEE8E8;border-left:2px solid #E24B4A;border-radius:8px;padding:7px 10px;font-size:11px;color:#A32D2D}
+
+/* точно как .progress-bar в мокапе */
+.progress-bar{background:#F0F0F0;border-radius:6px;padding:7px 10px;font-size:10px;color:#555;display:flex;align-items:center;gap:6px}
+.progress-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;animation:pulse 1.5s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* INPUT — точно как .chat-input-bar */
+.chat-input-bar{display:flex;align-items:center;gap:6px;border:1px solid #DDD;border-radius:8px;padding:5px 10px;background:#fff}
+.chat-input-bar textarea{flex:1;font-size:11px;color:#AAA;border:none;outline:none;background:transparent;resize:none;font-family:inherit;min-height:18px;max-height:60px}
+.chat-input-bar textarea::placeholder{color:#AAA}
+.chat-input-bar textarea:focus{color:#222}
+
+/* точно как .send-btn в мокапе */
+.send-btn{width:22px;height:22px;border-radius:5px;background:#1A3A6B;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:none;cursor:pointer;transition:background 0.2s}
 .send-btn:hover{background:#15305A}
 .send-btn:disabled{background:#C0C0C0;cursor:not-allowed}
-.input-hint{font-size:10px;color:#CCC;text-align:center}
 
-/* DASHBOARD PANEL */
-.dash-panel{flex:1;background:#FAFAFA;display:flex;flex-direction:column;overflow:hidden}
-.dash-panel-header{padding:12px 16px 8px;border-bottom:1px solid #EEEEEE;font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.06em;display:flex;align-items:center;justify-content:space-between;background:#fff;flex-shrink:0}
-.dash-live-badge{font-size:10px;color:#1D9E75;font-weight:500;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px}
-.dash-live-dot{width:5px;height:5px;border-radius:50%;background:#1D9E75;animation:pulse 1.4s infinite}
+/* DASHBOARD PANEL — точно как .hybrid-dash */
+.hybrid-dash{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;background:#FAFAFA;overflow-y:auto}
+.dash-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em}
+.dash-status{font-size:10px;color:#1D9E75;font-weight:500;display:flex;align-items:center;gap:4px}
+.dash-header-row{display:flex;align-items:center;justify-content:space-between}
 
-.dash-content{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-
-/* KPI */
-.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+/* KPI — точно как в мокапе */
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .kpi{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:8px 10px}
 .kpi-l{font-size:10px;color:#888;margin-bottom:2px}
 .kpi-v{font-size:17px;font-weight:500;color:#222}
-.kpi-d{font-size:10px;margin-top:2px}
-.kpi-d.red{color:#A32D2D}
-.kpi-d.green{color:#27500A}
-.kpi-d.neutral{color:#888}
+.kpi-d-r{font-size:10px;color:#A32D2D}
+.kpi-d-g{font-size:10px;color:#27500A}
+.kpi-d-n{font-size:10px;color:#888}
 
-/* CHART */
-.chart-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:12px 14px}
-.chart-title{font-size:10px;font-weight:500;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em}
-.chart-wrapper{position:relative;height:180px}
+/* CHART AREA — точно как в мокапе */
+.chart-area{background:#fff;border:1px solid #EEEEEE;border-radius:8px;flex:1;min-height:140px;padding:10px;position:relative}
+.chart-area canvas{width:100%!important;height:100%!important}
+.chart-title{font-size:10px;color:#888;margin-bottom:6px}
 
-/* PROGRESS CARD */
-.progress-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:10px 12px}
-.progress-card-title{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
-.iter-track{height:5px;background:#F0F0F0;border-radius:3px;overflow:hidden;margin-bottom:6px}
-.iter-fill{height:100%;background:#378ADD;border-radius:3px;transition:width 0.5s ease}
-.iter-label{font-size:10px;color:#555;display:flex;align-items:center;gap:5px}
+/* ITERATION PROGRESS */
+.iter-progress{background:#F0F0F0;border-radius:6px;padding:8px 12px}
+.iter-track{height:4px;background:#D0D0D0;border-radius:2px;overflow:hidden;margin:6px 0}
+.iter-fill{height:100%;background:#378ADD;border-radius:2px;transition:width 0.5s ease}
 
 /* SUMMARY */
-.summary-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:12px 14px}
-.summary-title{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
-.summary-text{font-size:11px;color:#333;line-height:1.65;white-space:pre-wrap}
+.summary-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:10px 12px}
+.summary-title{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+.summary-text{font-size:11px;color:#333;line-height:1.6;white-space:pre-wrap}
 .summary-text b{font-weight:600;color:#1A3A6B}
 
-/* EMPTY */
-.dash-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#CCC;gap:10px;text-align:center;padding:40px}
-.dash-empty-icon{font-size:40px}
-.dash-empty-title{font-size:13px;color:#AAA;font-weight:500}
-.dash-empty-sub{font-size:11px;color:#CCC;max-width:260px;line-height:1.5}
+/* EMPTY STATE */
+.dash-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#CCC;gap:8px;text-align:center;padding:40px}
+.dash-empty-icon{font-size:36px}
+.dash-empty-title{font-size:12px;color:#AAA;font-weight:500}
+.dash-empty-sub{font-size:10px;color:#CCC;max-width:240px;line-height:1.5}
+
+/* CHART BAR (static fallback) */
+.bar{border-radius:2px 2px 0 0}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="header-logo">SG <span>Analytics</span> Engine</div>
-  <div class="header-right">
-    <div class="header-status" id="headerStatus">Ready</div>
-    <div class="header-badge" id="headerBadge">Э1 — CSV Analyst</div>
+<div class="page-header">
+  <div>
+    <div class="page-title">SG Analytics Engine</div>
+    <div class="page-sub">Universal AI Analytics Platform</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="page-sub" id="headerStatus">Готов к работе</div>
+    <div class="header-badge">Э1 — CSV Analyst</div>
   </div>
 </div>
 
 <div class="main">
 
-  <!-- CHAT -->
-  <div class="chat-panel">
-    <div class="panel-label">Чат с аналитиком</div>
+  <!-- CHAT — точная копия .hybrid-chat из мокапа -->
+  <div class="hybrid-chat">
+    <div class="chat-label">Чат с аналитиком</div>
 
     <div class="upload-zone" id="uploadZone">
-      <div class="upload-icon">📂</div>
-      <div class="upload-text">Перетащи CSV или <strong>нажми для загрузки</strong></div>
+      <div class="upload-zone-text">📂 Перетащи CSV или <strong>нажми для загрузки</strong></div>
       <div class="upload-filename" id="uploadFilename"></div>
       <input type="file" id="fileInput" accept=".csv,.txt" style="display:none">
     </div>
 
-    <div class="messages" id="messages">
+    <div class="msgs" id="messages">
       <div class="msg-ai">Привет! Загрузи CSV файл и задай вопрос — я проанализирую данные и покажу результаты на дашборде справа.</div>
     </div>
 
-    <div class="chat-input-area">
-      <div class="chat-input-row">
-        <textarea class="chat-input" id="chatInput" placeholder="Задайте вопрос о ваших данных..." rows="1"></textarea>
-        <button class="send-btn" id="sendBtn" disabled>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 11L11 6.5 2 2v3.5l6 1-6 1V11z" fill="white"/></svg>
-        </button>
-      </div>
-      <div class="input-hint">Сначала загрузи CSV, затем задай вопрос · Enter для отправки</div>
+    <!-- точно как .chat-input-bar -->
+    <div class="chat-input-bar">
+      <textarea id="chatInput" placeholder="Задайте вопрос..." rows="1"></textarea>
+      <button class="send-btn" id="sendBtn" disabled>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 8L8 5 2 2v2.5l4 .5-4 .5V8z" fill="white"/></svg>
+      </button>
     </div>
   </div>
 
-  <!-- DASHBOARD -->
-  <div class="dash-panel">
-    <div class="dash-panel-header">
-      <span>Дашборд — обновляется по ходу диалога</span>
-      <div class="dash-live-badge" id="dashLiveBadge" style="display:none">
-        <div class="dash-live-dot"></div>
-        <span id="dashStatus"></span>
+  <!-- DASHBOARD — точная копия .hybrid-dash из мокапа -->
+  <div class="hybrid-dash" id="dashPanel">
+    <div class="dash-header-row">
+      <div class="dash-label">Дашборд — обновляется по ходу диалога</div>
+      <div class="dash-status" id="dashStatus" style="display:none">
+        <div class="progress-dot"></div>
+        <span id="dashStatusText"></span>
       </div>
     </div>
-    <div class="dash-content" id="dashContent">
+
+    <div id="dashContent" style="display:flex;flex-direction:column;gap:8px;flex:1">
       <div class="dash-empty">
         <div class="dash-empty-icon">📊</div>
         <div class="dash-empty-title">Дашборд пуст</div>
@@ -169,7 +169,7 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const dashContent = document.getElementById("dashContent");
 const dashStatus = document.getElementById("dashStatus");
-const dashLiveBadge = document.getElementById("dashLiveBadge");
+const dashStatusText = document.getElementById("dashStatusText");
 const headerStatus = document.getElementById("headerStatus");
 
 // UPLOAD
@@ -186,17 +186,18 @@ function handleFile(file) {
     csvContent = e.target.result;
     uploadZone.classList.add("has-file");
     uploadFilename.textContent = `✓ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
-    uploadZone.querySelector(".upload-text").innerHTML = "Файл загружен — готов к анализу";
+    uploadZone.querySelector(".upload-zone-text").innerHTML = "Файл загружен — готов к анализу";
     sendBtn.disabled = false;
     chatInput.placeholder = "Что хотите узнать из этих данных?";
-    addMessage("ai", `Файл загружен: **${file.name}**\nСтрок: ~${csvContent.split('\n').length - 1}\nЗадайте любой вопрос о данных.`);
+    chatInput.style.color = "#222";
+    addMessage("ai", `Файл загружен: **${file.name}**\nСтрок: ~${csvContent.split('\n').length - 1}\nЗадайте любой вопрос.`);
   };
   reader.readAsText(file);
 }
 
 // INPUT
 chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
-chatInput.addEventListener("input", () => { chatInput.style.height = "auto"; chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + "px"; });
+chatInput.addEventListener("input", () => { chatInput.style.height = "auto"; chatInput.style.height = Math.min(chatInput.scrollHeight, 60) + "px"; });
 sendBtn.addEventListener("click", sendMessage);
 
 function sendMessage() {
@@ -212,7 +213,7 @@ function addMessage(type, text) {
   const div = document.createElement("div");
   if (type === "user") { div.className = "msg-user"; div.textContent = text; }
   else if (type === "ai") { div.className = "msg-ai"; div.innerHTML = fmt(text); }
-  else if (type === "progress") { div.className = "msg-progress"; div.innerHTML = `<div class="progress-dot"></div><span>${text}</span>`; div.id = "progressMsg"; }
+  else if (type === "progress") { div.className = "progress-bar"; div.innerHTML = `<div class="progress-dot"></div><span>${text}</span>`; div.id = "progressMsg"; }
   else if (type === "error") { div.className = "msg-error"; div.textContent = text; }
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
@@ -228,8 +229,8 @@ async function startAnalysis(question) {
   isAnalyzing = true;
   sendBtn.disabled = true;
   headerStatus.textContent = "Анализирую...";
-  dashLiveBadge.style.display = "flex";
-  dashStatus.textContent = "Запуск...";
+  dashStatus.style.display = "flex";
+  dashStatusText.textContent = "Запуск...";
 
   addMessage("user", question);
   addMessage("progress", "Запускаю анализ...");
@@ -253,7 +254,7 @@ async function startAnalysis(question) {
 
   let attempts = 0;
   const poll = setInterval(async () => {
-    if (++attempts > 120) { clearInterval(poll); removeProgress(); addMessage("error", "Таймаут анализа. Попробуйте снова."); resetState(); return; }
+    if (++attempts > 120) { clearInterval(poll); removeProgress(); addMessage("error", "Таймаут. Попробуйте снова."); resetState(); return; }
     try {
       const resp = await fetch(`${WORKER_URL}/result/${sessionId}`);
       const data = await resp.json();
@@ -264,7 +265,7 @@ async function startAnalysis(question) {
         const msg = data.message || "Анализирую...";
         updateProgress(`${msg} (${iter}/${total})`);
         showProgress(iter, total, msg);
-        dashStatus.textContent = `Итерация ${iter}/${total}`;
+        dashStatusText.textContent = `Итерация ${iter}/${total}`;
       }
 
       if (data.status === "completed") {
@@ -272,7 +273,7 @@ async function startAnalysis(question) {
         removeProgress();
         addMessage("ai", data.result.summary);
         showResults(data.result, question);
-        dashStatus.textContent = `Завершено за ${(data.result.durationMs/1000).toFixed(1)}с`;
+        dashStatusText.textContent = `Завершено за ${(data.result.durationMs/1000).toFixed(1)}с`;
         headerStatus.textContent = "Готов";
         resetState();
       }
@@ -280,7 +281,7 @@ async function startAnalysis(question) {
       if (data.status === "error") {
         clearInterval(poll);
         removeProgress();
-        addMessage("error", `Ошибка анализа: ${data.error || "Неизвестная ошибка"}`);
+        addMessage("error", `Ошибка: ${data.error || "Неизвестная ошибка"}`);
         resetState();
       }
     } catch {}
@@ -289,14 +290,16 @@ async function startAnalysis(question) {
 
 function resetState() { isAnalyzing = false; sendBtn.disabled = false; }
 
-// DASHBOARD
+// DASHBOARD — точная структура как в мокапе
 function showProgress(iter, total, message) {
   const pct = total > 0 ? Math.round(iter / total * 100) : 0;
   dashContent.innerHTML = `
-    <div class="progress-card">
-      <div class="progress-card-title">Анализ выполняется</div>
+    <div class="iter-progress">
+      <div class="progress-bar" style="background:transparent;padding:0;margin-bottom:4px">
+        <div class="progress-dot"></div>
+        <span style="font-size:10px;color:#555">${message} — итерация ${iter} из ${total}</span>
+      </div>
       <div class="iter-track"><div class="iter-fill" style="width:${pct}%"></div></div>
-      <div class="iter-label"><div class="progress-dot"></div>${message} — итерация ${iter} из ${total}</div>
     </div>
     <div class="dash-empty" style="flex:1">
       <div class="dash-empty-icon">⚙️</div>
@@ -312,18 +315,21 @@ function showResults(result, question) {
   const chartData = extractChartData(result);
   let html = "";
 
+  // KPI — точно как в мокапе
   if (metrics.length > 0) {
     html += `<div class="kpi-row">`;
     metrics.slice(0, 4).forEach(m => {
-      html += `<div class="kpi"><div class="kpi-l">${m.label}</div><div class="kpi-v">${m.value}</div>${m.delta ? `<div class="kpi-d ${m.cls}">${m.delta}</div>` : ""}</div>`;
+      html += `<div class="kpi"><div class="kpi-l">${m.label}</div><div class="kpi-v">${m.value}</div><div class="${m.cls}">${m.delta || ""}</div></div>`;
     });
     html += `</div>`;
   }
 
+  // CHART AREA — точно как в мокапе
   if (chartData.labels.length > 0) {
-    html += `<div class="chart-card"><div class="chart-title">${question}</div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>`;
+    html += `<div class="chart-area"><div class="chart-title">${question}</div><canvas id="mainChart"></canvas></div>`;
   }
 
+  // SUMMARY
   html += `<div class="summary-card"><div class="summary-title">Итоги анализа</div><div class="summary-text" id="summaryText"></div></div>`;
 
   dashContent.innerHTML = html;
@@ -334,9 +340,13 @@ function showResults(result, question) {
       type: "bar",
       data: {
         labels: chartData.labels,
-        datasets: [{ label: "Значение", data: chartData.values, backgroundColor: ["#378ADD","#1D9E75","#EF9F27","#E24B4A","#9B59B6"].slice(0, chartData.labels.length), borderRadius: 3 }]
+        datasets: [{ data: chartData.values, backgroundColor: ["#378ADD","#1D9E75","#EF9F27","#E24B4A","#9B59B6"].slice(0, chartData.labels.length), borderRadius: 2 }]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: "#F0F0F0" } }, x: { grid: { display: false } } } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: "#F0F0F0" } }, x: { grid: { display: false } } }
+      }
     });
   }
 }
@@ -348,10 +358,10 @@ function extractMetrics(result) {
       const data = JSON.parse(iter.output);
       if (data.insights) {
         const ins = data.insights;
-        if (ins.total_revenue !== undefined) metrics.push({ label: "Выручка", value: fmtNum(ins.total_revenue), delta: null });
-        if (ins.total_units !== undefined) metrics.push({ label: "Единиц продано", value: fmtNum(ins.total_units), delta: null });
-        if (ins.top_3_revenue_concentration_pct !== undefined) metrics.push({ label: "Концентрация топ-3", value: ins.top_3_revenue_concentration_pct.toFixed(1) + "%", delta: "Доля выручки", cls: "neutral" });
-        if (ins.avg_revenue_per_product !== undefined) metrics.push({ label: "Средняя выручка", value: fmtNum(ins.avg_revenue_per_product), delta: null });
+        if (ins.total_revenue !== undefined) metrics.push({ label: "Выручка", value: fmtNum(ins.total_revenue), delta: "", cls: "kpi-d-n" });
+        if (ins.total_units !== undefined) metrics.push({ label: "Единиц продано", value: fmtNum(ins.total_units), delta: "", cls: "kpi-d-n" });
+        if (ins.top_3_revenue_concentration_pct !== undefined) metrics.push({ label: "Концентрация топ-3", value: ins.top_3_revenue_concentration_pct.toFixed(1) + "%", delta: "Доля выручки", cls: "kpi-d-n" });
+        if (ins.avg_revenue_per_product !== undefined) metrics.push({ label: "Средняя выручка", value: fmtNum(ins.avg_revenue_per_product), delta: "", cls: "kpi-d-n" });
       }
       if (metrics.length >= 4) break;
     } catch {}
