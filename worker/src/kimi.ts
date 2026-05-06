@@ -1,14 +1,3 @@
-export interface KimiMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface KimiResponse {
-  content: string;
-  iterations: number;
-  pythonCode?: string;
-}
-
 export interface IterationResult {
   python: string;
   summary: string;
@@ -23,17 +12,14 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    // TD-001 CLOSED: switched to Kimi K2.6 via DeepInfra
     this.baseUrl = 'https://api.deepinfra.com/v1/openai';
     this.model = 'moonshotai/Kimi-K2.6';
   }
 
-  // Generates Python code + summary + convergence signal in one call
-  // Returns structured IterationResult — orchestrator uses summary for next iteration context
   async generateIteration(
     dataDescription: string,
     question: string,
-    iterationSummaries: string[], // summaries from previous iterations, NOT raw outputs
+    iterationSummaries: string[],
     iteration: number,
     maxIterations: number
   ): Promise<IterationResult> {
@@ -52,39 +38,95 @@ Output results: print(json.dumps({"result": ...}, ensure_ascii=False))
 
 Respond ONLY with valid JSON (no markdown, no backticks):
 {
-  "python": "<executable Python code, single line strings escaped>",
+  "python": "<executable Python code>",
   "summary": "<1-2 sentences: what this iteration found>",
   "enough": <true if you can now fully answer the question, false otherwise>,
-  "reason": "<why enough or what's still missing>"
+  "reason": "<why enough or what is still missing>"
 }`;
 
     const contextBlock = iterationSummaries.length > 0
       ? `\n\nWhat we know so far:\n${iterationSummaries.map((s, i) => `Iteration ${i + 1}: ${s}`).join('\n')}`
       : '';
 
-    const iterNote = `(iteration ${iteration}/${maxIterations})`;
-    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} ${iterNote}${contextBlock}\n\nWrite focused Python for ONE specific check. Do not repeat previous analysis.`;
+    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} (iteration ${iteration}/${maxIterations})${contextBlock}\n\nWrite focused Python for ONE specific check. Do not repeat previous analysis.`;
 
-    const raw = await this.callAPI(systemPrompt, userMessage, 2000);
+    const raw = await this.callAPIStreaming(systemPrompt, userMessage, 2000);
     return this.parseIterationResult(raw);
   }
 
-  async generateFinalAnalysis(question: string, summaries: string[], language: string = 'en'): Promise<string> {
+  async generateFinalAnalysis(question: string, summaries: string[], language: string = 'ru'): Promise<string> {
     const langInstruction = language === 'ru'
       ? 'Respond in Russian. Be concise and business-focused. Use plain text, no markdown headers.'
       : 'Respond in English. Be concise and business-focused.';
 
-    const systemPrompt = `You are a business analyst. Synthesize data analysis findings into clear insights and actionable recommendations. ${langInstruction}
-Structure: 1-2 sentence summary, then key findings, then 1 concrete recommendation.`;
+    const systemPrompt = `You are a business analyst. Synthesize findings into clear insights and actionable recommendations. ${langInstruction}
+Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
 
     const userMessage = `Question: ${question}\n\nFindings from ${summaries.length} analysis iterations:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
 
-    return await this.callAPI(systemPrompt, userMessage, 1500);
+    return await this.callAPIStreaming(systemPrompt, userMessage, 1500);
+  }
+
+  // Streaming fetch — reads response token by token, returns full text
+  // Required for large MoE models like Kimi K2.6 to avoid connection timeout
+  private async callAPIStreaming(systemPrompt: string, userMessage: string, maxTokens: number): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: maxTokens,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0.6,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Kimi API error ${response.status}: ${err}`);
+    }
+
+    // Read SSE stream and accumulate content
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
+
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) fullContent += delta;
+        } catch {
+          // Skip malformed SSE chunks
+        }
+      }
+    }
+
+    return fullContent.trim();
   }
 
   private parseIterationResult(raw: string): IterationResult {
     try {
-      // Strip markdown fences if model added them despite instructions
       const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(clean);
       return {
@@ -94,7 +136,6 @@ Structure: 1-2 sentence summary, then key findings, then 1 concrete recommendati
         reason: parsed.reason || '',
       };
     } catch {
-      // Fallback: treat entire response as Python code, no early exit
       console.error('[KimiClient] Failed to parse iteration JSON, falling back to raw code');
       return {
         python: this.extractCode(raw),
@@ -103,35 +144,6 @@ Structure: 1-2 sentence summary, then key findings, then 1 concrete recommendati
         reason: 'JSON parse failed',
       };
     }
-  }
-
-  private async callAPI(systemPrompt: string, userMessage: string, maxTokens: number = 2000): Promise<string> {
-    const bodyStr = JSON.stringify({
-      model: this.model,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0.6,
-    });
-
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-      body: bodyStr,
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Kimi API error ${response.status}: ${err}`);
-    }
-
-    const data: any = await response.json();
-    return data.choices[0].message.content;
   }
 
   private extractCode(text: string): string {
