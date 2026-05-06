@@ -159,4 +159,73 @@ export class AnalysisOrchestrator implements DurableObject {
             kimi.generatePython(dataDescription, question, prevResult, i),
             20000, `kimi iteration ${i}`
           );
-          console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.le
+          console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.length} chars)`);
+        } catch (err) {
+          console.error(`[${sessionId}] Kimi error iter ${i}:`, err);
+          executionOutputs.push(`Kimi error: ${String(err)}`);
+          break;
+        }
+
+        let execResult: any;
+        try {
+          execResult = await this.withTimeout(
+            e2b.runCode(sandboxId, pythonCode),
+            15000, `e2b iteration ${i}`
+          );
+          console.log(`[${sessionId}] Iter ${i}: Executed, stdout=${execResult.stdout.slice(0, 100)}, error=${execResult.error}`);
+        } catch (err) {
+          execResult = { stdout: "", stderr: String(err), error: String(err), executionTime: 0 };
+          console.error(`[${sessionId}] E2B timeout iter ${i}:`, err);
+        }
+
+        const output = execResult.error
+          ? `ERROR: ${execResult.error}\nSTDERR: ${execResult.stderr}`
+          : execResult.stdout || execResult.stderr || "(no output)";
+
+        executionOutputs.push(output);
+        result.iterations.push({ n: i, output, executionTimeMs: execResult.executionTime || 0 });
+
+        const parsed = formatter.parseExecutionResult(output);
+        if (parsed.metrics.length > 0) result.metrics = parsed.metrics;
+        if (parsed.charts.length > 0) result.charts = parsed.charts;
+      }
+
+      console.log(`[${sessionId}] Generating final summary...`);
+      await this.saveStatus({
+        sessionId, iteration: maxIter, total: maxIter,
+        message: "Generating final summary...", status: "running", question,
+      });
+
+      try {
+        result.summary = await this.withTimeout(
+          kimi.generateFinalAnalysis(question, executionOutputs, language),
+          25000, "final summary"
+        );
+        console.log(`[${sessionId}] Summary OK (${result.summary.length} chars)`);
+      } catch (err) {
+        console.error(`[${sessionId}] Summary timeout:`, err);
+        result.summary = `Analysis completed in ${maxIter} iterations. ${executionOutputs[executionOutputs.length - 1]?.slice(0, 500) || "No output"}`;
+      }
+
+      result.durationMs = Date.now() - startTime;
+      console.log(`[${sessionId}] COMPLETED in ${result.durationMs}ms`);
+
+      await this.saveStatus({
+        sessionId, iteration: maxIter, total: maxIter,
+        message: "Analysis complete", status: "completed",
+        result, completedAt: new Date().toISOString(), question,
+      });
+
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[${sessionId}] FATAL ERROR:`, errMsg);
+      result.error = errMsg;
+      result.durationMs = Date.now() - startTime;
+      await this.saveStatus({
+        sessionId, iteration: 0, total: maxIter,
+        message: `Error: ${errMsg}`, status: "error",
+        error: errMsg, result, question,
+      });
+    }
+  }
+}
