@@ -16,24 +16,36 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    // TODO_TEMP TD-001: временно Claude API вместо Kimi K2.6
-    // ВЕРНУТЬ: baseUrl = 'https://api.deepinfra.com/v1/openai', model = 'moonshotai/Kimi-K2-Instruct'
-    // ТРИГГЕР: пополнить баланс DeepInfra (~$10), проверить DEEPINFRA_API_KEY в Cloudflare secrets
+    // TODO_TEMP TD-001: temporarily using Claude API instead of Kimi K2.6
+    // REVERT: baseUrl = 'https://api.deepinfra.com/v1/openai', model = 'moonshotai/Kimi-K2-Instruct'
+    // TRIGGER: top up DeepInfra balance (~$10), verify DEEPINFRA_API_KEY in Cloudflare secrets
     this.baseUrl = 'https://api.anthropic.com/v1';
     this.model = 'claude-sonnet-4-5';
   }
 
   async generatePython(dataDescription: string, question: string, previousResult?: string, iteration?: number): Promise<string> {
     const systemPrompt = `You are a Python data analyst. Write clean, executable Python code to analyze data and answer questions.
+
+CRITICAL CONSTRAINTS - Judge0 CE sandbox has NO third-party libraries:
+- FORBIDDEN: pandas, numpy, matplotlib, scipy, sklearn, or ANY import not in Python stdlib
+- ALLOWED: csv, json, io, math, statistics, collections, itertools, functools, datetime, re, operator
+
 The CSV data is available as a string in the variable CSV_DATA (already defined before your code runs).
-Always start with: import pandas as pd, io; df = pd.read_csv(io.StringIO(CSV_DATA))
-Always use pandas for data manipulation. Always print results as JSON using: import json; print(json.dumps({...}))
-Return ONLY the Python code, no explanations, no markdown fences.`;
+
+Parse CSV like this:
+import csv, json, io
+reader = csv.DictReader(io.StringIO(CSV_DATA))
+rows = list(reader)
+
+Always output results as JSON:
+print(json.dumps({"result": ...}))
+
+Return ONLY executable Python code. No explanations. No markdown fences. No import pandas.`;
 
     const iterNote = iteration ? ` (iteration ${iteration})` : '';
     const userMessage = previousResult
-      ? `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\nPrevious result:\n${previousResult}\n\nImprove the analysis. Focus on deeper insights. Return only Python code.`
-      : `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\n\nWrite Python code to analyze this data and answer the question. Return only Python code.`;
+      ? `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\nPrevious result:\n${previousResult}\n\nImprove the analysis. Deeper insights. Return only Python code. No pandas.`
+      : `Data schema: ${dataDescription}\nQuestion: ${question}${iterNote}\n\nWrite Python code to analyze this data. Return only Python code. No pandas.`;
 
     const response = await this.callAPI(systemPrompt, userMessage);
     return this.extractCode(response);
@@ -77,7 +89,7 @@ Format: 1-2 sentence summary, key findings as bullet points, 1 concrete recommen
 
       if (!response.ok) {
         const err = await response.text();
-        throw new Error(`Claude API error: ${response.status} — ${err}`);
+        throw new Error(`Claude API error: ${response.status} - ${err}`);
       }
 
       const data: any = await response.json();
@@ -101,7 +113,7 @@ Format: 1-2 sentence summary, key findings as bullet points, 1 concrete recommen
 
       if (!response.ok) {
         const err = await response.text();
-        throw new Error(`DeepInfra API error: ${response.status} — ${err}`);
+        throw new Error(`DeepInfra API error: ${response.status} - ${err}`);
       }
 
       const data: any = await response.json();
