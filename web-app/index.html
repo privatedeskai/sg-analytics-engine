@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Analytics Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:      #0F1117;
+  --bg2:     #161B24;
+  --bg3:     #1E2533;
+  --bg4:     #252D3D;
+  --border:  rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --accent:  #00E887;
+  --accent2: #00C46E;
+  --accent-dim: rgba(0,232,135,0.10);
+  --text:    #FFFFFF;
+  --text2:   #B0BAC8;
+  --text3:   #6B7A90;
+  --red:     #FF5A72;
+  --amber:   #FFB020;
+  --blue:    #4DA6FF;
+  --radius:  14px;
+  --radius2: 9px;
+  --mono: 'DM Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 54px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15,17,23,0.95);
+  backdrop-filter: blur(16px);
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.logo { display: flex; align-items: center; gap: 10px; }
+
+.logo-mark {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 16px rgba(0,232,135,0.35);
+}
+
+.logo-text { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text); }
+.logo-text em { color: var(--accent); font-style: normal; }
+
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.status-pill {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
+  background: var(--bg2); border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 20px;
+}
+
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 7px var(--accent);
+  animation: blink 2.4s infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+.btn-upload {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  color: #0F1117; background: var(--accent);
+  border: none; padding: 7px 16px; border-radius: var(--radius2);
+  cursor: pointer; transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 2px 12px rgba(0,232,135,0.30);
+}
+.btn-upload:hover { background: var(--accent2); transform: translateY(-1px); }
+
+.main { display: flex; flex: 1; overflow: hidden; position: relative; z-index: 1; }
+
+.chat-panel {
+  width: 390px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.chat-top { padding: 14px 18px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
+.panel-label {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+.file-badge {
+  display: none; align-items: center; gap: 7px;
+  margin-top: 9px; padding: 7px 11px;
+  background: var(--accent-dim); border: 1px solid rgba(0,232,135,0.22);
+  border-radius: var(--radius2); font-family: var(--mono); font-size: 11px; color: var(--accent);
+}
+.file-badge.show { display: flex; }
+
+.messages {
+  flex: 1; overflow-y: auto; padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  scrollbar-width: thin; scrollbar-color: var(--bg4) transparent;
+}
+.messages::-webkit-scrollbar { width: 3px; }
+.messages::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; text-align: center; padding: 32px 24px;
+}
+
+.empty-icon {
+  width: 52px; height: 52px;
+  border: 1px solid var(--border2); border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text3); margin-bottom: 10px; background: var(--bg3);
+}
+
+.empty-state h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.empty-state p { font-size: 12px; color: var(--text2); line-height: 1.6; max-width: 210px; }
+.empty-hint { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+.msg { display: flex; flex-direction: column; gap: 3px; animation: fadein 0.25s ease; }
+@keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+.msg-user { align-items: flex-end; }
+.msg-ai   { align-items: flex-start; }
+
+.bubble {
+  max-width: 90%; padding: 10px 14px;
+  font-size: 13.5px; line-height: 1.65; border-radius: 11px;
+}
+
+.msg-user .bubble {
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text); border-bottom-right-radius: 3px;
+}
+
+.msg-ai .bubble {
+  background: var(--bg3);
+  border: 1px solid rgba(0,232,135,0.18);
+  border-left: 2px solid var(--accent);
+  color: var(--text); border-bottom-left-radius: 3px;
+}
+
+.progress-bubble {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 11px; border-bottom-left-radius: 3px;
+  font-family: var(--mono); font-size: 12px; color: var(--text2);
+  max-width: 90%;
+}
+
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--bg4); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.75s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.prog-iter { color: var(--accent); font-weight: 500; margin-left: auto; }
+
+.chat-input-wrap { padding: 12px 14px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+
+.chip {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--text2); background: var(--bg3);
+  border: 1px solid var(--border2); padding: 5px 10px;
+  border-radius: 6px; cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.chip:hover { border-color: rgba(0,232,135,0.45); color: var(--accent); background: var(--accent-dim); }
+
+.input-box {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 11px; padding: 10px 10px 10px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input-box:focus-within { border-color: rgba(0,232,135,0.5); box-shadow: 0 0 0 3px var(--accent-dim); }
+
+.chat-ta {
+  flex: 1; background: none; border: none; outline: none;
+  font-family: var(--sans); font-size: 13.5px; color: var(--text);
+  resize: none; line-height: 1.5; max-height: 110px; min-height: 22px;
+}
+.chat-ta::placeholder { color: var(--text3); }
+
+.send-btn {
+  width: 34px; height: 34px; background: var(--accent);
+  border: none; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all 0.15s;
+  box-shadow: 0 2px 8px rgba(0,232,135,0.25);
+}
+.send-btn:hover:not(:disabled) { background: var(--accent2); transform: scale(1.06); }
+.send-btn:disabled { background: var(--bg4); cursor: not-allowed; box-shadow: none; }
+
+.input-hint { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 7px; padding: 0 2px; }
+
+.dash-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.dash-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+
+.live-ind { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); transition: background 0.3s; }
+.live-dot.on { background: var(--accent); box-shadow: 0 0 7px var(--accent); animation: blink 1.4s infinite; }
+
+.dash-scroll {
+  flex: 1; overflow-y: auto; padding: 20px 22px;
+  scrollbar-width: thin; scrollbar-color: var(--bg3) transparent;
+}
+.dash-scroll::-webkit-scrollbar { width: 3px; }
+.dash-scroll::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+
+.dash-empty {
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; text-align: center;
+}
+
+.dash-empty-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; opacity: 0.2; }
+.dash-empty-card { width: 148px; height: 84px; border: 1px solid var(--border2); border-radius: var(--radius); background: var(--bg2); }
+.dash-empty h3 { font-size: 15px; font-weight: 600; color: var(--text); }
+.dash-empty p { font-size: 12px; color: var(--text2); font-family: var(--mono); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+
+.kpi {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+  position: relative; overflow: hidden;
+  animation: cardin 0.35s ease both;
+}
+@keyframes cardin { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+.kpi::after {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 2px; border-radius: 1px 1px 0 0;
+}
+.kpi.c-green::after { background: var(--accent); }
+.kpi.c-blue::after  { background: var(--blue); }
+.kpi.c-red::after   { background: var(--red); }
+.kpi.c-amber::after { background: var(--amber); }
+
+.kpi-lbl {
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px;
+}
+
+.kpi-val { font-family: var(--mono); font-size: 24px; font-weight: 500; color: var(--text); line-height: 1; margin-bottom: 6px; }
+.kpi-sub { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+.chart-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  margin-bottom: 16px;
+  animation: cardin 0.4s ease both; animation-delay: 0.08s;
+}
+
+.card-title {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 16px;
+}
+
+.chart-wrap { height: 196px; position: relative; }
+
+.summary-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px;
+  animation: cardin 0.4s ease both; animation-delay: 0.14s;
+}
+
+.summary-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.summary-pip { width: 3px; height: 16px; background: var(--accent); border-radius: 2px; }
+.summary-title { font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--accent); text-transform: uppercase; letter-spacing: 0.07em; }
+
+.summary-body { font-size: 13.5px; color: var(--text2); line-height: 1.75; }
+.summary-body strong { color: var(--text); }
+
+.iter-track { display: flex; gap: 4px; margin-top: 16px; }
+.iter-seg { flex: 1; height: 3px; background: var(--bg4); border-radius: 2px; transition: background 0.3s; }
+.iter-seg.done { background: var(--accent); }
+
+#file-input { display: none; }
+</style>
+</head>
+<body>
+<input type="file" id="file-input" accept=".csv,.xlsx,.xls">
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M3 13L8 3L13 13" stroke="#0F1117" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5.5 9.5H10.5" stroke="#0F1117" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="logo-text">SG<em>.</em>Analytics</span>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><div class="status-dot"></div>engine online</div>
+    <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <path d="M6.5 9V2M3.5 5l3-3 3 3M2 11h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Upload CSV
+    </button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="chat-panel">
+    <div class="chat-top">
+      <div class="panel-label">AI Analyst</div>
+      <div class="file-badge" id="file-badge">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <rect x="2" y="1" width="8" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M4 4.5h4M4 7h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <span id="fname">data.csv</span>
+      </div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M9 17H3V7l9-4 9 4v10h-6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M12 3v11M3 7l9 4 9-4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>Upload your data</h3>
+        <p>Drop a CSV file and ask anything — revenue, trends, anomalies, forecasts.</p>
+        <span class="empty-hint">↑ Click Upload CSV to begin</span>
+      </div>
+    </div>
+
+    <div class="chat-input-wrap">
+      <div class="chips">
+        <div class="chip" onclick="useChip(this)">Top products by revenue</div>
+        <div class="chip" onclick="useChip(this)">Find anomalies</div>
+        <div class="chip" onclick="useChip(this)">Weekly trend</div>
+        <div class="chip" onclick="useChip(this)">Profit margins</div>
+      </div>
+      <div class="input-box">
+        <textarea class="chat-ta" id="chat-ta" placeholder="Ask about your data..." rows="1"></textarea>
+        <button class="send-btn" id="send-btn" onclick="send()" disabled>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M2 13L13 7.5 2 2v4l8 1.5L2 9v4z" fill="#0F1117"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint" id="hint">Upload a file to enable analysis</div>
+    </div>
+  </div>
+
+  <div class="dash-panel">
+    <div class="dash-top">
+      <div class="panel-label">Live Dashboard</div>
+      <div class="live-ind">
+        <div class="live-dot" id="live-dot"></div>
+        <span id="live-lbl">waiting</span>
+      </div>
+    </div>
+    <div class="dash-scroll" id="dash-scroll">
+      <div class="dash-empty" id="dash-empty">
+        <div class="dash-empty-grid">
+          <div class="dash-empty-card"></div>
+          <div class="dash-empty-card"></div>
+          <div class="dash-empty-card"></div>
+          <div class="dash-empty-card"></div>
+        </div>
+        <h3>Dashboard updates live</h3>
+        <p>Metrics appear as analysis runs</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKER = 'https://sg-analytics-engine.dorofeevov17.workers.dev';
+let csv = null, analyzing = false, poll = null, chart = null;
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    csv = ev.target.result;
+    document.getElementById('file-badge').classList.add('show');
+    document.getElementById('fname').textContent = f.name;
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('hint').textContent = 'Enter to send · Shift+Enter for new line';
+    document.getElementById('empty-state')?.remove();
+    aiMsg(`<strong>${f.name}</strong> loaded — ask me anything about your data.`);
+  };
+  r.readAsText(f);
+});
+
+const ta = document.getElementById('chat-ta');
+ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 110) + 'px'; });
+ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+function useChip(el) { ta.value = el.textContent; ta.focus(); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function scrollMsgs() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
+
+function userMsg(text) {
+  document.getElementById('messages').insertAdjacentHTML('beforeend',
+    `<div class="msg msg-user"><div class="bubble">${esc(text)}</div></div>`);
+  scrollMsgs();
+}
+
+function aiMsg(html) {
+  document.getElementById('messages').insertAdjacentHTML('beforeend',
+    `<div class="msg msg-ai"><div class="bubble">${html}</div></div>`);
+  scrollMsgs();
+}
+
+function addProgress() {
+  document.getElementById('messages').insertAdjacentHTML('beforeend', `
+    <div class="msg msg-ai" id="prog-wrap">
+      <div class="progress-bubble">
+        <div class="spinner"></div>
+        <span id="prog-txt">Initializing...</span>
+        <span class="prog-iter" id="prog-iter"></span>
+      </div>
+    </div>`);
+  scrollMsgs();
+}
+
+function updProg(msg, iter, total) {
+  const t = document.getElementById('prog-txt');
+  const i = document.getElementById('prog-iter');
+  if (t) t.textContent = msg;
+  if (i && iter) i.textContent = `${iter}/${total}`;
+}
+
+function rmProg() { document.getElementById('prog-wrap')?.remove(); }
+
+function setLive(on, label) {
+  document.getElementById('live-dot').className = 'live-dot' + (on ? ' on' : '');
+  document.getElementById('live-lbl').textContent = label;
+}
+
+async function send() {
+  const q = ta.value.trim();
+  if (!q || !csv || analyzing) return;
+  analyzing = true;
+  ta.value = ''; ta.style.height = 'auto';
+  document.getElementById('send-btn').disabled = true;
+  userMsg(q); addProgress(); setLive(true, 'analyzing');
+  try {
+    const res = await fetch(`${WORKER}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, csvContent: csv, userId: 'user', language: 'en' })
+    });
+    const { sessionId } = await res.json();
+    doPoll(sessionId);
+  } catch {
+    rmProg(); aiMsg('Connection error. Check that the Worker is running.');
+    setLive(false, 'error'); reset();
+  }
+}
+
+function doPoll(sid) {
+  let tries = 0;
+  poll = setInterval(async () => {
+    if (++tries > 120) { clearInterval(poll); rmProg(); aiMsg('Timed out.'); setLive(false,'timeout'); reset(); return; }
+    try {
+      const d = await (await fetch(`${WORKER}/result/${sid}`)).json();
+      if (d.status === 'running' || d.status === 'started') updProg(d.message || 'Analyzing...', d.iteration, d.total);
+      if (d.status === 'completed') {
+        clearInterval(poll); rmProg();
+        if (d.result?.summary) { aiMsg(fmtSummary(d.result.summary)); renderDash(d.result); }
+        setLive(false, `done · ${Math.round((d.result?.durationMs||0)/1000)}s`);
+        reset();
+      }
+      if (d.status === 'error') {
+        clearInterval(poll); rmProg();
+        aiMsg(`Error: ${d.error||'unknown'}`); setLive(false,'error'); reset();
+      }
+    } catch {}
+  }, 1500);
+}
+
+function reset() { analyzing = false; document.getElementById('send-btn').disabled = !csv; }
+
+function renderDash(result) {
+  const scroll = document.getElementById('dash-scroll');
+  document.getElementById('dash-empty')?.remove();
+
+  let kpiHtml = '';
+  if (result.charts?.length > 0) {
+    const c = result.charts[0];
+    const labels = c.labels || [], data = c.datasets?.[0]?.data || [];
+    const colors = ['c-green','c-blue','c-amber','c-red'];
+    const kpis = labels.slice(0,4).map((l,i) => ({ l, v: data[i], c: colors[i%4] }));
+    if (kpis.length) {
+      kpiHtml = `<div class="kpi-row">` + kpis.map((k,i) => `
+        <div class="kpi ${k.c}" style="animation-delay:${i*70}ms">
+          <div class="kpi-lbl">${fmtLabel(k.l)}</div>
+          <div class="kpi-val" data-target="${k.v}">${fmtVal(k.v, k.l)}</div>
+          <div class="kpi-sub">computed</div>
+        </div>`).join('') + `</div>`;
+    }
+  }
+
+  const chartHtml = `<div class="chart-card">
+    <div class="card-title">Revenue breakdown · iteration analysis</div>
+    <div class="chart-wrap"><canvas id="mchart"></canvas></div>
+  </div>`;
+
+  const iters = result.iterations || [];
+  const segs = Array(Math.min(iters.length,10)).fill(0).map(() => `<div class="iter-seg done"></div>`).join('');
+
+  const summaryHtml = result.summary ? `<div class="summary-card">
+    <div class="summary-head"><div class="summary-pip"></div><div class="summary-title">AI Recommendation</div></div>
+    <div class="summary-body">${fmtSummary(result.summary)}</div>
+    <div class="iter-track">${segs}</div>
+  </div>` : '';
+
+  scroll.innerHTML = kpiHtml + chartHtml + summaryHtml;
+  setTimeout(() => drawChart(result), 80);
+  animateKPIs();
+}
+
+function drawChart(result) {
+  const canvas = document.getElementById('mchart');
+  if (!canvas) return;
+  if (chart) { chart.destroy(); chart = null; }
+  let labels = [], values = [];
+  try {
+    const last = result.iterations[result.iterations.length-1].output;
+    const p = JSON.parse(last);
+    const arr = p.result || p.top_3_products || p.products || Object.values(p).find(v => Array.isArray(v));
+    if (Array.isArray(arr) && arr.length) {
+      labels = arr.map(r => r.product || r.name || String(Object.values(r)[0]));
+      values = arr.map(r => parseFloat(r.revenue || r.total_revenue || r.value || Object.values(r)[1]) || 0);
+    }
+  } catch {}
+  if (!labels.length && result.charts?.[0]) {
+    labels = result.charts[0].labels || [];
+    values = result.charts[0].datasets?.[0]?.data || [];
+  }
+  if (!labels.length) return;
+  chart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: labels.map((_,i) => i===0 ? 'rgba(0,232,135,0.85)' : 'rgba(0,232,135,0.28)'),
+        borderColor: labels.map((_,i) => i===0 ? '#00E887' : 'rgba(0,232,135,0.5)'),
+        borderWidth: 1, borderRadius: 5, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 700, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1E2533', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+          titleColor: '#B0BAC8', bodyColor: '#FFFFFF',
+          titleFont: { family: 'DM Mono', size: 11 }, bodyFont: { family: 'DM Mono', size: 13 }, padding: 10,
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6B7A90', font: { family: 'DM Mono', size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6B7A90', font: { family: 'DM Mono', size: 11 } } }
+      }
+    }
+  });
+}
+
+function animateKPIs() {
+  document.querySelectorAll('.kpi-val[data-target]').forEach(el => {
+    const target = parseFloat(el.dataset.target);
+    if (isNaN(target)) return;
+    const label = el.previousElementSibling?.textContent || '';
+    const start = performance.now(), dur = 700;
+    (function tick(now) {
+      const p = Math.min((now-start)/dur, 1), e = 1-Math.pow(1-p,3);
+      el.textContent = fmtVal(target*e, label);
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = fmtVal(target, label);
+    })(start);
+  });
+}
+
+function fmtLabel(l) { return String(l).replace(/_/g,' ').replace(/pct/g,'%').toUpperCase().slice(0,18); }
+
+function fmtVal(v, label) {
+  v = parseFloat(v); if (isNaN(v)) return String(v);
+  const l = String(label).toLowerCase();
+  if (l.includes('pct')||l.includes('share')||l.includes('percent')) return v.toFixed(1)+'%';
+  if (l.includes('revenue')||l.includes('profit')||l.includes('sales')||v>500) return '$'+Math.round(v).toLocaleString('en');
+  return v.toFixed(v%1===0?0:2);
+}
+
+function fmtSummary(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^## (.*)/gm, '<strong style="display:block;margin:8px 0 4px;color:#fff;font-size:14px">$1</strong>')
+    .replace(/^- (.*)/gm, '<span style="display:block;padding-left:14px;position:relative;margin:3px 0"><span style="position:absolute;left:0;color:#00E887">›</span>$1</span>')
+    .replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+}
+</script>
+</body>
+</html>
