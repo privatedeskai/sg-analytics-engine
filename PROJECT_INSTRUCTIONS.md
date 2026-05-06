@@ -9,10 +9,29 @@
 
 Claude выполняет ЭТО в начале каждой сессии до любой работы:
 
-1. Прочитать PROJECT_STATUS.md — текущее состояние
-2. Прочитать TECH_DEBT.md — активные долги и заплатки
+1. Прочитать PROJECT_STATUS.md с диска через MCP filesystem
+2. Прочитать TECH_DEBT.md с диска через MCP filesystem
 3. Сообщить Олегу: текущий статус + список активных долгов (TD-XXX)
 4. Только после этого — приступать к задачам
+
+---
+
+## 0.1 КОНЕЦ СЕССИИ — ОБЯЗАТЕЛЬНАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ
+
+В конце каждой сессии Claude делает ЭТО без напоминания:
+
+1. Обновить PROJECT_STATUS.md через MCP filesystem
+2. Обновить TECH_DEBT.md через MCP filesystem
+3. Выполнить git commit + push
+4. Скопировать файлы в Загрузки ПРАВИЛЬНОЙ командой (с кодировкой UTF-8):
+
+```powershell
+Get-Content "C:\Users\dorof\Documents\sg-analytics-engine\PROJECT_STATUS.md" -Encoding UTF8 | Set-Content "C:\Users\dorof\Downloads\PROJECT_STATUS.md" -Encoding UTF8 ; Get-Content "C:\Users\dorof\Documents\sg-analytics-engine\TECH_DEBT.md" -Encoding UTF8 | Set-Content "C:\Users\dorof\Downloads\TECH_DEBT.md" -Encoding UTF8 ; Get-Content "C:\Users\dorof\Documents\sg-analytics-engine\DECISIONS.md" -Encoding UTF8 | Set-Content "C:\Users\dorof\Downloads\DECISIONS.md" -Encoding UTF8 ; Get-Content "C:\Users\dorof\Documents\sg-analytics-engine\PROJECT_INSTRUCTIONS.md" -Encoding UTF8 | Set-Content "C:\Users\dorof\Downloads\PROJECT_INSTRUCTIONS.md" -Encoding UTF8
+```
+
+5. Сказать Олегу: "Загрузи 4 файла из папки Загрузки в Project knowledge — удали старые, загрузи новые"
+
+**ВАЖНО:** Использовать ТОЛЬКО команду из пункта 4 — она сохраняет кириллицу корректно. Copy-Item ломает кодировку.
 
 ---
 
@@ -96,7 +115,7 @@ Output: текст + Chart.js
 - **ПРАВИЛО 2:** PowerShell команды в отдельных блоках, без &&, группировать через ;
 - **ПРАВИЛО 3:** Полные файлы целиком — никогда частичные вставки
 - **ПРАВИЛО 4:** Claude не задаёт вопросы Олегу об архитектуре — решает сам
-- **ПРАВИЛО 5:** ВСЕ URL — ТОЛЬКО В БЛОКАХ КОДА. Самопроверка: найти все "http" → каждый должен быть внутри блока кода.
+- **ПРАВИЛО 5:** ВСЕ URL — ТОЛЬКО В БЛОКАХ КОДА.
 - **ПРАВИЛО 6:** РЕГЛАМЕНТ ВЫБОРА ВНЕШНИХ РЕШЕНИЙ — см. раздел 13.
 - **ПРАВИЛО 7:** РЕГЛАМЕНТ ТЕХНИЧЕСКОГО ДОЛГА — см. раздел 14.
 
@@ -111,7 +130,7 @@ C:\Users\dorof\Documents\sg-analytics-engine
 cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
 
 # Web App
-cd web-app ; npx vercel --prod --yes ; cd ..
+cd C:\Users\dorof\Documents\sg-analytics-engine\web-app ; npx vercel --prod --yes ; cd ..
 
 # Checkpoint коммит
 git add . ; git commit -m "checkpoint: [описание]" ; git push
@@ -141,22 +160,21 @@ git add . ; git commit -m "checkpoint: [описание]" ; git push
 
 ```
 sg-analytics-engine/
-├── PROJECT_STATUS.md       ← статус (читать 1-м)
-├── TECH_DEBT.md            ← активные долги (читать 2-м)
-├── DECISIONS.md            ← архитектурные решения
-├── PROJECT_INSTRUCTIONS.md ← этот файл
+├── PROJECT_STATUS.md
+├── TECH_DEBT.md
+├── DECISIONS.md
+├── PROJECT_INSTRUCTIONS.md
 ├── worker/
 │   ├── src/
 │   │   ├── index.ts
 │   │   ├── orchestrator.ts
-│   │   ├── e2b.ts          ← Judge0 CE клиент
+│   │   ├── e2b.ts
 │   │   ├── kimi.ts
 │   │   └── connectors/
 │   │       └── csv.ts
 │   └── wrangler.toml
 ├── web-app/
 │   ├── index.html
-│   └── app.js
 └── docs/
 ```
 
@@ -172,9 +190,9 @@ sg-analytics-engine/
 | Оркестратор итерационного цикла | ✅ |
 | CSV загрузчик + нормализация | ✅ |
 | Kimi K2.6 через DeepInfra | ⚠️ TD-001 |
-| Output formatter + Chart.js | ⬜ |
-| Базовый UI + деплой Vercel | ⬜ |
-| Тестирование на реальных данных | ⬜ |
+| Output formatter + Chart.js | ✅ |
+| Базовый UI + деплой Vercel | ✅ |
+| Тестирование на реальных данных | 🔄 В процессе |
 | Stripe биллинг | ⬜ |
 | Закрытая бета | ⬜ |
 
@@ -230,22 +248,17 @@ Judge0 CE — без ключа.
 
 При выборе любого сервиса, пакета, SDK, платформы — обязательный алгоритм:
 
-1. **Сформулировать критерии** — функция, совместимость со стеком
-2. **Найти минимум 2-3 варианта** через web_search — не останавливаться на первом
-3. **Отсортировать по трениям:**
-   - ✅ Без регистрации / без ключа / без карты → приоритет 1
-   - ✅ Бесплатный ключ, без карты → приоритет 2
-   - ⚠️ Бесплатный план, нужна карта → приоритет 3, предупредить Олега
-   - ❌ Платный → только если нет бесплатного
-4. **Показать сравнение** перед рекомендацией
-5. **Обосновать выбор**
+1. Сформулировать критерии — функция, совместимость со стеком
+2. Найти минимум 2-3 варианта через web_search
+3. Отсортировать по трениям (без ключа → бесплатный ключ → с картой → платный)
+4. Показать сравнение перед рекомендацией
+5. Обосновать выбор
 
 ---
 
 ## 14. РЕГЛАМЕНТ ТЕХНИЧЕСКОГО ДОЛГА
 
 ### Правило 1 — Маркировка в коде
-Каждое временное решение помечается комментарием:
 ```
 // TODO_TEMP TD-XXX: [описание]
 // ВЕРНУТЬ: [точные изменения]
@@ -253,22 +266,5 @@ Judge0 CE — без ключа.
 ```
 
 ### Правило 2 — Реестр в TECH_DEBT.md
-Все активные долги — только в TECH_DEBT.md. Формат:
-```
-### TD-XXX | [название]
-- Файл: [путь]
-- Маркер: TODO_TEMP TD-XXX
-- Текущее: [что сейчас]
-- Вернуть: [точные изменения]
-- Триггер: [когда возвращать]
-- Влияние: [что страдает]
-```
-
 ### Правило 3 — Читать в начале сессии
-TECH_DEBT.md читается после PROJECT_STATUS.md — до начала работы.
-Claude сообщает Олегу список активных долгов.
-
 ### Правило 4 — Закрывать явно
-При устранении долга:
-- Удалить маркер TODO_TEMP из кода
-- Перенести запись в секцию "Закрытые долги" в TECH_DEBT.md с датой
