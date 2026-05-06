@@ -1,15 +1,13 @@
 {
   "name": "sg-analytics-engine-worker",
   "version": "1.0.0",
-  "type": "module",
+  "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "typecheck": "tsc --noEmit"
+    "tail": "wrangler tail --format pretty"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240725.0",
-    "typescript": "^5.5.0",
-    "wrangler": "^4.87.0"
+    "wrangler": "3.99.0"
   }
 }
