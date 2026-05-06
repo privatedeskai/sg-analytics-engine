@@ -1,7 +1,7 @@
 # SG Analytics Engine — Статус проекта
 **Этап:** Э1 — Универсальный CSV Analyst
 **Обновлено:** 2026-05-06
-**Сессия:** 6
+**Сессия:** 7
 
 ---
 
@@ -32,14 +32,17 @@ Checkpoint: git add . ; git commit -m "checkpoint: [описание]" ; git pus
 | Репозиторий | ✅ | github.com/privatedeskai/sg-analytics-engine |
 | Worker деплой | ✅ | /status, /analyze, /result/:id |
 | KV хранилище | ✅ | сессии пишутся и читаются корректно |
-| Оркестратор | ✅ | AnalysisOrchestrator, 10 итераций |
+| Оркестратор | ✅ | AnalysisOrchestrator, 5 итераций (TD-002) |
 | Judge0 CE | ✅ | ce.judge0.com, без ключа |
 | kimi.ts | ✅ | claude-sonnet-4-5 временно (TD-001) |
 | CSV загрузчик | ✅ | connectors/csv.ts |
 | Output formatter | ✅ | output.ts |
 | Pipeline end-to-end | ✅ | completed + summary + KPI + график |
-| MCP filesystem | ✅ | Claude пишет файлы напрямую |
+| e2b.ts | ✅ | Unicode-safe base64 (TextEncoder/TextDecoder) |
 | UI — базовый | ✅ | тёмная тема, DM Sans, shimmer accent |
+| UI — poll timeout | ✅ | 300 попыток × 2 сек = 10 минут |
+| UI — extractMetrics | ✅ | универсальный сканер любой JSON структуры |
+| UI — скролл чата | ✅ | scrollIntoView к началу нового сообщения |
 | DESIGN.md | ✅ | дизайн-система зафиксирована в репо |
 | Stripe биллинг | ⬜ | не начат |
 
@@ -50,18 +53,26 @@ Checkpoint: git add . ; git commit -m "checkpoint: [описание]" ; git pus
 | ID | Описание | Триггер возврата |
 |----|----------|-----------------|
 | TD-001 | Claude API вместо Kimi K2.6 | Пополнить DeepInfra ~$10 |
-| TD-003 | Таймауты в orchestrator.ts | После 3 стабильных тестов |
+| TD-002 | MAX_ITERATIONS=5 вместо 10 | После переключения на Kimi K2.6 (TD-001) |
+| TD-003 | Таймауты 15s в orchestrator.ts | После стабилизации оценить увеличить |
 
 Подробности — в TECH_DEBT.md
 
 ---
 
-## Первые шаги сессии 7
+## Первые шаги сессии 8
 
-1. Починить KPI карточки — показываются 2 из 4, расширить extractMetrics() под любую JSON структуру
-2. Починить скролл чата — скроллит к середине summary, нужно к началу нового сообщения
-3. Stripe биллинг — базовый paywall
-4. TD-001 — пополнить DeepInfra ~$10, переключить kimi.ts на Kimi K2.6
+1. **Тест pipeline** — задеплоен новый orchestrator (5 итераций, таймауты 15s), нужно проверить что анализ доходит до completed. Загрузить test-analytics.csv, задать вопрос "Какие категории растут, какие падают?"
+2. **maxIterations в UI** — в web-app/index.html изменить `maxIterations: 10` на `maxIterations: 5` (строка с JSON.stringify в startAnalysis)
+3. **Stripe биллинг** — после успешного теста pipeline
+
+---
+
+## ВАЖНО — обновление Project Knowledge в конце сессии
+Скопировать 4 файла в Загрузки и загрузить в Project knowledge:
+```powershell
+Copy-Item "C:\Users\dorof\Documents\sg-analytics-engine\PROJECT_STATUS.md" "C:\Users\dorof\Downloads\PROJECT_STATUS.md" ; Copy-Item "C:\Users\dorof\Documents\sg-analytics-engine\TECH_DEBT.md" "C:\Users\dorof\Downloads\TECH_DEBT.md" ; Copy-Item "C:\Users\dorof\Documents\sg-analytics-engine\DECISIONS.md" "C:\Users\dorof\Downloads\DECISIONS.md" ; Copy-Item "C:\Users\dorof\Documents\sg-analytics-engine\PROJECT_INSTRUCTIONS.md" "C:\Users\dorof\Downloads\PROJECT_INSTRUCTIONS.md"
+```
 
 ---
 
@@ -86,4 +97,15 @@ MCP filesystem подключён. Claude пишет файлы напрямую
 Piston API → Judge0 CE. Pipeline: started → running. Создан TECH_DEBT.md.
 
 ### Сессия 6 — 2026-05-06
-Pipeline end-to-end: completed + summary + KPI + график. TD-002 закрыт. UI переписан — тёмная premium тема, DM Sans, shimmer accent line. DESIGN.md создан. Протестировано на test.csv — результат корректный. Мелкие баги: KPI 2/4, скролл чата.
+Pipeline end-to-end: completed + summary + KPI + график. TD-002 закрыт. UI переписан — тёмная premium тема, DM Sans, shimmer accent. DESIGN.md создан.
+
+### Сессия 7 — 2026-05-06
+- Восстановлен контекст после потери Project Knowledge — разобрались с процессом обновления
+- Исправлен e2b.ts: Unicode-safe base64 через TextEncoder/TextDecoder (btoa ломался на кириллице)
+- Исправлен kimi.ts: charset=utf-8, промпты Python только на английском
+- UI: poll timeout увеличен до 10 минут (300×2s), исправлен extractMetrics (универсальный), исправлен скролл чата
+- orchestrator.ts: MAX_ITERATIONS=5, таймауты снижены до 15s — вписывается в DO CPU лимит
+- Создан test-analytics.csv — 3 месяца, 5 продуктов, 60 строк, аномалии
+- Pipeline застревал на итерации 5/10 — причина: DO CPU лимит ~30s, 10 итераций не вмещались
+- Задеплоен финальный fix: 5 итераций × 15s = укладывается в лимит
+- Тест не завершён до конца сессии — проверить в начале сессии 8

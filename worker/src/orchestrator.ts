@@ -39,7 +39,6 @@ interface Env {
   E2B_API_KEY: string;
   DEEPINFRA_API_KEY: string;
   CLAUDE_API_KEY: string;
-  MAX_ITERATIONS: string;
 }
 
 export class AnalysisOrchestrator implements DurableObject {
@@ -77,10 +76,11 @@ export class AnalysisOrchestrator implements DurableObject {
 
   private getIterationMessage(i: number, total: number): string {
     const pct = Math.round(i / total * 100);
-    if (i <= 2) return `Loading data, checking structure... (${pct}%)`;
-    if (i <= 4) return `Grouping by periods, searching for anomalies... (${pct}%)`;
-    if (i <= 7) return `Testing hypotheses, deepening analysis... (${pct}%)`;
-    return `Forming conclusions and recommendations... (${pct}%)`;
+    if (i === 1) return `Loading data, detecting schema... (${pct}%)`;
+    if (i === 2) return `Grouping by periods, searching anomalies... (${pct}%)`;
+    if (i === 3) return `Testing hypotheses... (${pct}%)`;
+    if (i === 4) return `Deepening analysis... (${pct}%)`;
+    return `Forming conclusions... (${pct}%)`;
   }
 
   private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -94,8 +94,9 @@ export class AnalysisOrchestrator implements DurableObject {
 
   private async runAnalysis(req: AnalysisRequest): Promise<void> {
     const startTime = Date.now();
-    const MAX_ITERATIONS = 10;
-    const maxIter = req.maxIterations || MAX_ITERATIONS;
+    // TODO_TEMP TD-002: max 5 iterations — DO CPU limit ~30s per iteration pair
+    // REVERT to 10 after switching to Kimi K2.6 (faster) — TD-001
+    const maxIter = 5;
     const { sessionId, question, csvContent, language = "en" } = req;
 
     console.log(`[${sessionId}] Starting analysis, maxIter=${maxIter}`);
@@ -118,7 +119,7 @@ export class AnalysisOrchestrator implements DurableObject {
       const sandboxId = await e2b.createSandbox(180000);
       await e2b.uploadCSV(sandboxId, csvContent);
 
-      // Schema detection — stdlib only, no pandas
+      // Schema detection
       console.log(`[${sessionId}] Getting schema...`);
       const schemaCode = [
         "import csv, json, io",
@@ -129,19 +130,18 @@ export class AnalysisOrchestrator implements DurableObject {
         "print(json.dumps({'schema': {'columns': columns, 'shape': [len(rows), len(columns)]}, 'sample': sample}))",
       ].join("\n");
 
-      // TODO_TEMP TD-003: увеличен до 25s — Judge0 CE иногда медленно стартует
       const schemaRun = await this.withTimeout(
         e2b.runCode(sandboxId, schemaCode),
-        25000, "schema detection"
+        15000, "schema detection"
       );
 
       let dataDescription = `CSV columns: ${csvContent.split('\n')[0]}`;
       try {
         const parsed = JSON.parse(schemaRun.stdout) as any;
         dataDescription = `Schema: ${JSON.stringify(parsed.schema)}\nSample: ${JSON.stringify(parsed.sample)}`;
-        console.log(`[${sessionId}] Schema OK: ${dataDescription.slice(0, 100)}`);
+        console.log(`[${sessionId}] Schema OK`);
       } catch {
-        console.log(`[${sessionId}] Schema parse failed, using default. stdout: ${schemaRun.stdout.slice(0, 200)}`);
+        console.log(`[${sessionId}] Schema parse failed, using header`);
       }
 
       const executionOutputs: string[] = [];
@@ -155,11 +155,12 @@ export class AnalysisOrchestrator implements DurableObject {
 
         let pythonCode = "";
         try {
-          const prevResult = executionOutputs.length > 0 ? executionOutputs[executionOutputs.length - 1] : undefined;
-          // TODO_TEMP TD-003: 25s для Kimi/Claude
+          const prevResult = executionOutputs.length > 0
+            ? executionOutputs[executionOutputs.length - 1]
+            : undefined;
           pythonCode = await this.withTimeout(
             kimi.generatePython(dataDescription, question, prevResult, i),
-            25000, `kimi iteration ${i}`
+            15000, `kimi iteration ${i}`
           );
           console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.length} chars)`);
         } catch (err) {
@@ -170,12 +171,11 @@ export class AnalysisOrchestrator implements DurableObject {
 
         let execResult: any;
         try {
-          // TODO_TEMP TD-003: 25s для Judge0 — wall_time_limit=20s + network overhead
           execResult = await this.withTimeout(
             e2b.runCode(sandboxId, pythonCode),
-            25000, `e2b iteration ${i}`
+            15000, `e2b iteration ${i}`
           );
-          console.log(`[${sessionId}] Iter ${i}: Executed, stdout=${execResult.stdout.slice(0, 100)}, error=${execResult.error}`);
+          console.log(`[${sessionId}] Iter ${i}: stdout=${execResult.stdout.slice(0, 80)}, error=${execResult.error}`);
         } catch (err) {
           execResult = { stdout: "", stderr: String(err), error: String(err), executionTime: 0 };
           console.error(`[${sessionId}] E2B timeout iter ${i}:`, err);
@@ -200,15 +200,17 @@ export class AnalysisOrchestrator implements DurableObject {
       });
 
       try {
-        // TODO_TEMP TD-003: 35s для финального summary
         result.summary = await this.withTimeout(
           kimi.generateFinalAnalysis(question, executionOutputs, language),
-          35000, "final summary"
+          20000, "final summary"
         );
         console.log(`[${sessionId}] Summary OK (${result.summary.length} chars)`);
       } catch (err) {
         console.error(`[${sessionId}] Summary timeout:`, err);
-        result.summary = `Analysis completed in ${maxIter} iterations. ${executionOutputs[executionOutputs.length - 1]?.slice(0, 500) || "No output"}`;
+        result.summary = executionOutputs
+          .filter(o => !o.startsWith("ERROR"))
+          .slice(-2)
+          .join("\n\n") || "Analysis completed. No summary available.";
       }
 
       result.durationMs = Date.now() - startTime;
