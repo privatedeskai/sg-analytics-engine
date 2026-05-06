@@ -6,355 +6,148 @@
 <title>SG Analytics Engine</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#F5F5F5;color:#222;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-    background: #F5F5F5;
-    color: #222;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+/* HEADER */
+.header{background:#fff;border-bottom:1px solid #E0E0E0;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.header-logo{font-size:15px;font-weight:600;color:#1A3A6B;letter-spacing:-0.01em}
+.header-logo span{color:#378ADD}
+.header-right{display:flex;align-items:center;gap:12px}
+.header-status{font-size:11px;color:#888}
+.header-badge{font-size:10px;padding:2px 8px;border-radius:4px;background:#EAF3DE;color:#27500A;font-weight:500}
 
-  .header {
-    background: #fff;
-    border-bottom: 1px solid #E0E0E0;
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-  }
-  .header-logo {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1A3A6B;
-    letter-spacing: -0.02em;
-  }
-  .header-logo span { color: #378ADD; }
-  .header-status { font-size: 12px; color: #888; }
+/* MAIN LAYOUT */
+.main{display:flex;flex:1;overflow:hidden}
 
-  .main { display: flex; flex: 1; overflow: hidden; }
+/* CHAT PANEL */
+.chat-panel{width:40%;min-width:320px;background:#fff;border-right:1px solid #E0E0E0;display:flex;flex-direction:column}
+.panel-label{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.06em;padding:12px 14px 8px;border-bottom:1px solid #F0F0F0}
 
-  .chat-panel {
-    width: 40%;
-    min-width: 340px;
-    background: #fff;
-    border-right: 1px solid #E0E0E0;
-    display: flex;
-    flex-direction: column;
-  }
+/* UPLOAD */
+.upload-zone{margin:10px 12px;border:1.5px dashed #D0D0D0;border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;background:#FAFAFA}
+.upload-zone:hover,.upload-zone.drag-over{border-color:#378ADD;background:#EEF5FD}
+.upload-zone.has-file{border-color:#1D9E75;background:#F0FBF4}
+.upload-icon{font-size:18px;margin-bottom:3px}
+.upload-text{font-size:11px;color:#888}
+.upload-text strong{color:#378ADD}
+.upload-filename{font-size:11px;color:#1D9E75;font-weight:500;margin-top:2px}
 
-  .chat-panel-header {
-    padding: 14px 18px 10px;
-    border-bottom: 1px solid #F0F0F0;
-    font-size: 11px;
-    font-weight: 500;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
+/* MESSAGES */
+.messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.msg-user{background:#F0F0F0;border-radius:8px 8px 2px 8px;padding:7px 10px;font-size:11px;color:#222;align-self:flex-end;max-width:85%}
+.msg-ai{background:#E8F0FE;border-radius:8px 8px 8px 2px;padding:8px 10px;font-size:11px;color:#1A3A6B;border-left:2px solid #378ADD;line-height:1.55;max-width:96%}
+.msg-progress{display:flex;align-items:center;gap:7px;padding:7px 10px;background:#F8F8F8;border-radius:8px;font-size:10px;color:#555}
+.msg-error{background:#FEE8E8;border-left:2px solid #E24B4A;border-radius:8px;padding:8px 10px;font-size:11px;color:#A32D2D}
+.progress-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;flex-shrink:0;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 
-  .upload-zone {
-    margin: 12px 16px;
-    border: 1.5px dashed #D0D0D0;
-    border-radius: 10px;
-    padding: 14px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    background: #FAFAFA;
-  }
-  .upload-zone:hover, .upload-zone.drag-over { border-color: #378ADD; background: #EEF5FD; }
-  .upload-zone.has-file { border-color: #1D9E75; background: #F0FBF4; }
-  .upload-zone-icon { font-size: 20px; margin-bottom: 4px; }
-  .upload-zone-text { font-size: 12px; color: #888; }
-  .upload-zone-text strong { color: #378ADD; }
-  .upload-zone-filename { font-size: 12px; color: #1D9E75; font-weight: 500; margin-top: 2px; }
+/* INPUT */
+.chat-input-area{padding:10px 12px;border-top:1px solid #F0F0F0;display:flex;flex-direction:column;gap:6px}
+.chat-input-row{display:flex;gap:6px;align-items:flex-end}
+.chat-input{flex:1;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-size:11px;font-family:inherit;resize:none;outline:none;min-height:36px;max-height:100px;transition:border-color 0.2s;color:#222;background:#fff}
+.chat-input:focus{border-color:#378ADD}
+.chat-input::placeholder{color:#BBB}
+.send-btn{width:36px;height:36px;border-radius:8px;background:#1A3A6B;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background 0.2s}
+.send-btn:hover{background:#15305A}
+.send-btn:disabled{background:#C0C0C0;cursor:not-allowed}
+.input-hint{font-size:10px;color:#CCC;text-align:center}
 
-  .messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
+/* DASHBOARD PANEL */
+.dash-panel{flex:1;background:#FAFAFA;display:flex;flex-direction:column;overflow:hidden}
+.dash-panel-header{padding:12px 16px 8px;border-bottom:1px solid #EEEEEE;font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.06em;display:flex;align-items:center;justify-content:space-between;background:#fff;flex-shrink:0}
+.dash-live-badge{font-size:10px;color:#1D9E75;font-weight:500;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px}
+.dash-live-dot{width:5px;height:5px;border-radius:50%;background:#1D9E75;animation:pulse 1.4s infinite}
 
-  .msg-user {
-    background: #F0F0F0;
-    border-radius: 10px 10px 2px 10px;
-    padding: 8px 12px;
-    font-size: 13px;
-    color: #222;
-    align-self: flex-end;
-    max-width: 88%;
-  }
+.dash-content{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 
-  .msg-ai {
-    background: #E8F0FE;
-    border-radius: 10px 10px 10px 2px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #1A3A6B;
-    border-left: 2px solid #378ADD;
-    line-height: 1.6;
-    max-width: 96%;
-    white-space: pre-wrap;
-  }
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.kpi{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:8px 10px}
+.kpi-l{font-size:10px;color:#888;margin-bottom:2px}
+.kpi-v{font-size:17px;font-weight:500;color:#222}
+.kpi-d{font-size:10px;margin-top:2px}
+.kpi-d.red{color:#A32D2D}
+.kpi-d.green{color:#27500A}
+.kpi-d.neutral{color:#888}
 
-  .msg-progress {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    background: #F8F8F8;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #555;
-  }
+/* CHART */
+.chart-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:12px 14px}
+.chart-title{font-size:10px;font-weight:500;color:#888;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em}
+.chart-wrapper{position:relative;height:180px}
 
-  .progress-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #1D9E75;
-    flex-shrink: 0;
-    animation: pulse 1.4s infinite;
-  }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+/* PROGRESS CARD */
+.progress-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:10px 12px}
+.progress-card-title{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+.iter-track{height:5px;background:#F0F0F0;border-radius:3px;overflow:hidden;margin-bottom:6px}
+.iter-fill{height:100%;background:#378ADD;border-radius:3px;transition:width 0.5s ease}
+.iter-label{font-size:10px;color:#555;display:flex;align-items:center;gap:5px}
 
-  .msg-error {
-    background: #FEE8E8;
-    border-left: 2px solid #E24B4A;
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #A32D2D;
-  }
+/* SUMMARY */
+.summary-card{background:#fff;border:1px solid #EEEEEE;border-radius:8px;padding:12px 14px}
+.summary-title{font-size:10px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+.summary-text{font-size:11px;color:#333;line-height:1.65;white-space:pre-wrap}
+.summary-text b{font-weight:600;color:#1A3A6B}
 
-  .chat-input-area {
-    padding: 12px 16px;
-    border-top: 1px solid #F0F0F0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .chat-input-row { display: flex; gap: 8px; align-items: flex-end; }
-
-  .chat-input {
-    flex: 1;
-    border: 1.5px solid #E0E0E0;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 13px;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-    min-height: 42px;
-    max-height: 120px;
-    transition: border-color 0.2s;
-    color: #222;
-    background: #fff;
-  }
-  .chat-input:focus { border-color: #378ADD; }
-  .chat-input::placeholder { color: #BBB; }
-
-  .send-btn {
-    width: 42px;
-    height: 42px;
-    border-radius: 10px;
-    background: #1A3A6B;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 0.2s;
-  }
-  .send-btn:hover { background: #15305A; }
-  .send-btn:disabled { background: #C0C0C0; cursor: not-allowed; }
-
-  .input-hint { font-size: 11px; color: #BBB; text-align: center; }
-
-  .dash-panel {
-    flex: 1;
-    background: #FAFAFA;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .dash-panel-header {
-    padding: 14px 20px 10px;
-    border-bottom: 1px solid #EEEEEE;
-    font-size: 11px;
-    font-weight: 500;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #fff;
-  }
-
-  .dash-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-
-  .kpi-card {
-    background: #fff;
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .kpi-label { font-size: 11px; color: #888; margin-bottom: 4px; }
-  .kpi-value { font-size: 22px; font-weight: 600; color: #222; line-height: 1.1; }
-  .kpi-delta { font-size: 11px; margin-top: 3px; }
-  .kpi-delta.positive { color: #1D9E75; }
-  .kpi-delta.negative { color: #E24B4A; }
-  .kpi-delta.neutral { color: #888; }
-
-  .chart-card {
-    background: #fff;
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
-    padding: 14px 16px;
-  }
-  .chart-card-title { font-size: 12px; font-weight: 500; color: #555; margin-bottom: 12px; }
-  .chart-wrapper { position: relative; height: 200px; }
-
-  .summary-card {
-    background: #fff;
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
-    padding: 14px 16px;
-  }
-  .summary-card-title {
-    font-size: 11px;
-    font-weight: 500;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 10px;
-  }
-  .summary-text { font-size: 13px; color: #333; line-height: 1.7; white-space: pre-wrap; }
-
-  .dash-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #CCC;
-    gap: 12px;
-    text-align: center;
-    padding: 40px;
-  }
-  .dash-empty-icon { font-size: 48px; }
-  .dash-empty-title { font-size: 15px; color: #AAA; font-weight: 500; }
-  .dash-empty-sub { font-size: 13px; color: #CCC; max-width: 280px; line-height: 1.5; }
-
-  .iter-progress {
-    background: #fff;
-    border: 1px solid #EEEEEE;
-    border-radius: 10px;
-    padding: 14px 16px;
-  }
-  .iter-progress-title {
-    font-size: 11px;
-    font-weight: 500;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 10px;
-  }
-  .iter-bar-track {
-    height: 6px;
-    background: #F0F0F0;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .iter-bar-fill {
-    height: 100%;
-    background: #378ADD;
-    border-radius: 3px;
-    transition: width 0.5s ease;
-  }
-  .iter-bar-label {
-    font-size: 12px;
-    color: #555;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .summary-text b { font-weight: 600; color: #1A3A6B; }
+/* EMPTY */
+.dash-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#CCC;gap:10px;text-align:center;padding:40px}
+.dash-empty-icon{font-size:40px}
+.dash-empty-title{font-size:13px;color:#AAA;font-weight:500}
+.dash-empty-sub{font-size:11px;color:#CCC;max-width:260px;line-height:1.5}
 </style>
 </head>
 <body>
 
 <div class="header">
   <div class="header-logo">SG <span>Analytics</span> Engine</div>
-  <div class="header-status" id="headerStatus">Ready</div>
+  <div class="header-right">
+    <div class="header-status" id="headerStatus">Ready</div>
+    <div class="header-badge" id="headerBadge">Э1 — CSV Analyst</div>
+  </div>
 </div>
 
 <div class="main">
 
+  <!-- CHAT -->
   <div class="chat-panel">
-    <div class="chat-panel-header">Chat with Analyst</div>
+    <div class="panel-label">Чат с аналитиком</div>
 
     <div class="upload-zone" id="uploadZone">
-      <div class="upload-zone-icon">📂</div>
-      <div class="upload-zone-text">Drop CSV file here or <strong>click to upload</strong></div>
-      <div class="upload-zone-filename" id="uploadFilename"></div>
+      <div class="upload-icon">📂</div>
+      <div class="upload-text">Перетащи CSV или <strong>нажми для загрузки</strong></div>
+      <div class="upload-filename" id="uploadFilename"></div>
       <input type="file" id="fileInput" accept=".csv,.txt" style="display:none">
     </div>
 
     <div class="messages" id="messages">
-      <div class="msg-ai">Hello! Upload a CSV file and ask a question — I'll analyze your data and show insights on the dashboard.</div>
+      <div class="msg-ai">Привет! Загрузи CSV файл и задай вопрос — я проанализирую данные и покажу результаты на дашборде справа.</div>
     </div>
 
     <div class="chat-input-area">
       <div class="chat-input-row">
-        <textarea
-          class="chat-input"
-          id="chatInput"
-          placeholder="Ask a question about your data..."
-          rows="1"
-        ></textarea>
+        <textarea class="chat-input" id="chatInput" placeholder="Задайте вопрос о ваших данных..." rows="1"></textarea>
         <button class="send-btn" id="sendBtn" disabled>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 13L13 8 3 3v3.5l7 1.5-7 1.5V13z" fill="white"/>
-          </svg>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 11L11 6.5 2 2v3.5l6 1-6 1V11z" fill="white"/></svg>
         </button>
       </div>
-      <div class="input-hint">Upload CSV first, then ask a question</div>
+      <div class="input-hint">Сначала загрузи CSV, затем задай вопрос · Enter для отправки</div>
     </div>
   </div>
 
+  <!-- DASHBOARD -->
   <div class="dash-panel">
     <div class="dash-panel-header">
-      <span>Live Dashboard</span>
-      <span id="dashStatus" style="font-size:11px;color:#1D9E75;font-weight:500;text-transform:none;letter-spacing:0"></span>
+      <span>Дашборд — обновляется по ходу диалога</span>
+      <div class="dash-live-badge" id="dashLiveBadge" style="display:none">
+        <div class="dash-live-dot"></div>
+        <span id="dashStatus"></span>
+      </div>
     </div>
     <div class="dash-content" id="dashContent">
       <div class="dash-empty">
         <div class="dash-empty-icon">📊</div>
-        <div class="dash-empty-title">Dashboard is empty</div>
-        <div class="dash-empty-sub">Upload a CSV file and ask a question — metrics and charts will appear here as analysis runs</div>
+        <div class="dash-empty-title">Дашборд пуст</div>
+        <div class="dash-empty-sub">Загрузи CSV и задай вопрос — метрики и графики появятся здесь по ходу анализа</div>
       </div>
     </div>
   </div>
@@ -365,7 +158,6 @@
 const WORKER_URL = "https://sg-analytics-engine.dorofeevov17.workers.dev";
 
 let csvContent = null;
-let csvFilename = null;
 let isAnalyzing = false;
 let currentChart = null;
 
@@ -377,267 +169,174 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 const dashContent = document.getElementById("dashContent");
 const dashStatus = document.getElementById("dashStatus");
+const dashLiveBadge = document.getElementById("dashLiveBadge");
 const headerStatus = document.getElementById("headerStatus");
 
+// UPLOAD
 uploadZone.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
-
-uploadZone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  uploadZone.classList.add("drag-over");
-});
+uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
 uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
-uploadZone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  uploadZone.classList.remove("drag-over");
-  handleFile(e.dataTransfer.files[0]);
-});
+uploadZone.addEventListener("drop", (e) => { e.preventDefault(); uploadZone.classList.remove("drag-over"); handleFile(e.dataTransfer.files[0]); });
 
 function handleFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = (e) => {
     csvContent = e.target.result;
-    csvFilename = file.name;
     uploadZone.classList.add("has-file");
-    uploadFilename.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-    uploadZone.querySelector(".upload-zone-text").innerHTML = "File loaded — ready to analyze";
+    uploadFilename.textContent = `✓ ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    uploadZone.querySelector(".upload-text").innerHTML = "Файл загружен — готов к анализу";
     sendBtn.disabled = false;
-    chatInput.placeholder = "What would you like to know about your data?";
-    addMessage("ai", `File loaded: **${file.name}**\nRows: ~${csvContent.split('\n').length - 1}\nAsk me anything about this data.`);
+    chatInput.placeholder = "Что хотите узнать из этих данных?";
+    addMessage("ai", `Файл загружен: **${file.name}**\nСтрок: ~${csvContent.split('\n').length - 1}\nЗадайте любой вопрос о данных.`);
   };
   reader.readAsText(file);
 }
 
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-});
-
-chatInput.addEventListener("input", () => {
-  chatInput.style.height = "auto";
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + "px";
-});
-
+// INPUT
+chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+chatInput.addEventListener("input", () => { chatInput.style.height = "auto"; chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + "px"; });
 sendBtn.addEventListener("click", sendMessage);
 
 function sendMessage() {
-  const question = chatInput.value.trim();
-  if (!question || !csvContent || isAnalyzing) return;
+  const q = chatInput.value.trim();
+  if (!q || !csvContent || isAnalyzing) return;
   chatInput.value = "";
   chatInput.style.height = "auto";
-  startAnalysis(question);
+  startAnalysis(q);
 }
 
+// MESSAGES
 function addMessage(type, text) {
   const div = document.createElement("div");
-  if (type === "user") {
-    div.className = "msg-user";
-    div.textContent = text;
-  } else if (type === "ai") {
-    div.className = "msg-ai";
-    div.innerHTML = formatText(text);
-  } else if (type === "progress") {
-    div.className = "msg-progress";
-    div.innerHTML = `<div class="progress-dot"></div><span>${text}</span>`;
-    div.id = "progressMsg";
-  } else if (type === "error") {
-    div.className = "msg-error";
-    div.textContent = text;
-  }
+  if (type === "user") { div.className = "msg-user"; div.textContent = text; }
+  else if (type === "ai") { div.className = "msg-ai"; div.innerHTML = fmt(text); }
+  else if (type === "progress") { div.className = "msg-progress"; div.innerHTML = `<div class="progress-dot"></div><span>${text}</span>`; div.id = "progressMsg"; }
+  else if (type === "error") { div.className = "msg-error"; div.textContent = text; }
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
   return div;
 }
 
-function updateProgress(text) {
-  const el = document.getElementById("progressMsg");
-  if (el) el.querySelector("span").textContent = text;
-}
+function updateProgress(text) { const el = document.getElementById("progressMsg"); if (el) el.querySelector("span").textContent = text; }
+function removeProgress() { const el = document.getElementById("progressMsg"); if (el) el.remove(); }
+function fmt(t) { return t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); }
 
-function removeProgress() {
-  const el = document.getElementById("progressMsg");
-  if (el) el.remove();
-}
-
-function formatText(text) {
-  return text
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/\n/g, "<br>");
-}
-
+// ANALYSIS
 async function startAnalysis(question) {
   isAnalyzing = true;
   sendBtn.disabled = true;
-  headerStatus.textContent = "Analyzing...";
+  headerStatus.textContent = "Анализирую...";
+  dashLiveBadge.style.display = "flex";
+  dashStatus.textContent = "Запуск...";
 
   addMessage("user", question);
-  addMessage("progress", "Starting analysis...");
-  showDashboardProgress(0, 10, "Initializing...");
+  addMessage("progress", "Запускаю анализ...");
+  showProgress(0, 10, "Инициализация...");
 
   let sessionId;
   try {
     const resp = await fetch(`${WORKER_URL}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        csvContent,
-        userId: "demo",
-        maxIterations: 10,
-        language: "en",
-      }),
+      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: 10, language: "ru" }),
     });
     const data = await resp.json();
     sessionId = data.sessionId;
-  } catch (err) {
+  } catch {
     removeProgress();
-    addMessage("error", "Failed to connect to analysis server. Please try again.");
+    addMessage("error", "Не удалось подключиться к серверу. Попробуйте снова.");
     resetState();
     return;
   }
 
   let attempts = 0;
-  const maxAttempts = 120;
   const poll = setInterval(async () => {
-    attempts++;
-    if (attempts > maxAttempts) {
-      clearInterval(poll);
-      removeProgress();
-      addMessage("error", "Analysis timeout. Please try again.");
-      resetState();
-      return;
-    }
-
+    if (++attempts > 120) { clearInterval(poll); removeProgress(); addMessage("error", "Таймаут анализа. Попробуйте снова."); resetState(); return; }
     try {
       const resp = await fetch(`${WORKER_URL}/result/${sessionId}`);
       const data = await resp.json();
 
       if (data.status === "running") {
-        const msg = data.message || "Analyzing...";
         const iter = data.iteration || 0;
         const total = data.total || 10;
+        const msg = data.message || "Анализирую...";
         updateProgress(`${msg} (${iter}/${total})`);
-        showDashboardProgress(iter, total, msg);
-        dashStatus.textContent = `Iteration ${iter}/${total}`;
+        showProgress(iter, total, msg);
+        dashStatus.textContent = `Итерация ${iter}/${total}`;
       }
 
       if (data.status === "completed") {
         clearInterval(poll);
         removeProgress();
-        const result = data.result;
-        addMessage("ai", result.summary);
-        showDashboardResults(result, question);
-        dashStatus.textContent = `Completed in ${(result.durationMs / 1000).toFixed(1)}s`;
-        headerStatus.textContent = "Ready";
+        addMessage("ai", data.result.summary);
+        showResults(data.result, question);
+        dashStatus.textContent = `Завершено за ${(data.result.durationMs/1000).toFixed(1)}с`;
+        headerStatus.textContent = "Готов";
         resetState();
       }
 
       if (data.status === "error") {
         clearInterval(poll);
         removeProgress();
-        addMessage("error", `Analysis error: ${data.error || "Unknown error"}`);
+        addMessage("error", `Ошибка анализа: ${data.error || "Неизвестная ошибка"}`);
         resetState();
       }
-
-    } catch (err) {
-      console.error("Poll error:", err);
-    }
+    } catch {}
   }, 1500);
 }
 
-function resetState() {
-  isAnalyzing = false;
-  sendBtn.disabled = false;
-}
+function resetState() { isAnalyzing = false; sendBtn.disabled = false; }
 
-function showDashboardProgress(iter, total, message) {
-  const pct = total > 0 ? Math.round((iter / total) * 100) : 0;
+// DASHBOARD
+function showProgress(iter, total, message) {
+  const pct = total > 0 ? Math.round(iter / total * 100) : 0;
   dashContent.innerHTML = `
-    <div class="iter-progress">
-      <div class="iter-progress-title">Analysis in progress</div>
-      <div class="iter-bar-track">
-        <div class="iter-bar-fill" style="width:${pct}%"></div>
-      </div>
-      <div class="iter-bar-label">
-        <div class="progress-dot"></div>
-        ${message} — iteration ${iter} of ${total}
-      </div>
+    <div class="progress-card">
+      <div class="progress-card-title">Анализ выполняется</div>
+      <div class="iter-track"><div class="iter-fill" style="width:${pct}%"></div></div>
+      <div class="iter-label"><div class="progress-dot"></div>${message} — итерация ${iter} из ${total}</div>
     </div>
     <div class="dash-empty" style="flex:1">
       <div class="dash-empty-icon">⚙️</div>
-      <div class="dash-empty-title">Building your analysis...</div>
-      <div class="dash-empty-sub">Metrics and charts will appear when analysis completes</div>
-    </div>
-  `;
+      <div class="dash-empty-title">Строю анализ...</div>
+      <div class="dash-empty-sub">Метрики и графики появятся после завершения</div>
+    </div>`;
 }
 
-function showDashboardResults(result, question) {
+function showResults(result, question) {
   if (currentChart) { currentChart.destroy(); currentChart = null; }
 
   const metrics = extractMetrics(result);
   const chartData = extractChartData(result);
-
   let html = "";
 
   if (metrics.length > 0) {
-    html += `<div class="kpi-grid">`;
+    html += `<div class="kpi-row">`;
     metrics.slice(0, 4).forEach(m => {
-      html += `
-        <div class="kpi-card">
-          <div class="kpi-label">${m.label}</div>
-          <div class="kpi-value">${m.value}</div>
-          ${m.delta ? `<div class="kpi-delta ${m.deltaClass}">${m.delta}</div>` : ""}
-        </div>`;
+      html += `<div class="kpi"><div class="kpi-l">${m.label}</div><div class="kpi-v">${m.value}</div>${m.delta ? `<div class="kpi-d ${m.cls}">${m.delta}</div>` : ""}</div>`;
     });
     html += `</div>`;
   }
 
   if (chartData.labels.length > 0) {
-    html += `
-      <div class="chart-card">
-        <div class="chart-card-title">${question}</div>
-        <div class="chart-wrapper">
-          <canvas id="mainChart"></canvas>
-        </div>
-      </div>`;
+    html += `<div class="chart-card"><div class="chart-title">${question}</div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>`;
   }
 
-  html += `
-    <div class="summary-card">
-      <div class="summary-card-title">Analysis Summary</div>
-      <div class="summary-text" id="summaryText"></div>
-    </div>`;
+  html += `<div class="summary-card"><div class="summary-title">Итоги анализа</div><div class="summary-text" id="summaryText"></div></div>`;
 
   dashContent.innerHTML = html;
-  document.getElementById("summaryText").innerHTML = formatText(result.summary);
+  document.getElementById("summaryText").innerHTML = fmt(result.summary);
 
   if (chartData.labels.length > 0) {
-    const ctx = document.getElementById("mainChart").getContext("2d");
-    currentChart = new Chart(ctx, {
+    currentChart = new Chart(document.getElementById("mainChart").getContext("2d"), {
       type: "bar",
       data: {
         labels: chartData.labels,
-        datasets: [{
-          label: "Value",
-          data: chartData.values,
-          backgroundColor: chartData.values.map((_, i) =>
-            ["#378ADD", "#1D9E75", "#EF9F27", "#E24B4A", "#9B59B6"][i % 5]
-          ),
-          borderRadius: 4,
-        }]
+        datasets: [{ label: "Значение", data: chartData.values, backgroundColor: ["#378ADD","#1D9E75","#EF9F27","#E24B4A","#9B59B6"].slice(0, chartData.labels.length), borderRadius: 3 }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          y: { beginAtZero: true, grid: { color: "#F0F0F0" } },
-          x: { grid: { display: false } }
-        }
-      }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: "#F0F0F0" } }, x: { grid: { display: false } } } }
     });
   }
 }
@@ -649,14 +348,10 @@ function extractMetrics(result) {
       const data = JSON.parse(iter.output);
       if (data.insights) {
         const ins = data.insights;
-        if (ins.total_revenue !== undefined)
-          metrics.push({ label: "Total Revenue", value: formatNum(ins.total_revenue), delta: null });
-        if (ins.total_units !== undefined)
-          metrics.push({ label: "Total Units", value: formatNum(ins.total_units), delta: null });
-        if (ins.top_3_revenue_concentration_pct !== undefined)
-          metrics.push({ label: "Top-3 Concentration", value: ins.top_3_revenue_concentration_pct.toFixed(1) + "%", delta: "Revenue share", deltaClass: "neutral" });
-        if (ins.avg_revenue_per_product !== undefined)
-          metrics.push({ label: "Avg Revenue / Product", value: formatNum(ins.avg_revenue_per_product), delta: null });
+        if (ins.total_revenue !== undefined) metrics.push({ label: "Выручка", value: fmtNum(ins.total_revenue), delta: null });
+        if (ins.total_units !== undefined) metrics.push({ label: "Единиц продано", value: fmtNum(ins.total_units), delta: null });
+        if (ins.top_3_revenue_concentration_pct !== undefined) metrics.push({ label: "Концентрация топ-3", value: ins.top_3_revenue_concentration_pct.toFixed(1) + "%", delta: "Доля выручки", cls: "neutral" });
+        if (ins.avg_revenue_per_product !== undefined) metrics.push({ label: "Средняя выручка", value: fmtNum(ins.avg_revenue_per_product), delta: null });
       }
       if (metrics.length >= 4) break;
     } catch {}
@@ -668,31 +363,17 @@ function extractChartData(result) {
   for (const iter of result.iterations) {
     try {
       const data = JSON.parse(iter.output);
-      if (data.top_3_products) {
-        return {
-          labels: data.top_3_products.map(p => p.product),
-          values: data.top_3_products.map(p => p.revenue),
-        };
-      }
+      if (data.top_3_products) return { labels: data.top_3_products.map(p => p.product), values: data.top_3_products.map(p => p.revenue) };
       if (Array.isArray(data.result) && data.result.length > 0) {
-        const first = data.result[0];
-        const keys = Object.keys(first);
-        if (keys.length >= 2) {
-          return {
-            labels: data.result.map(r => String(r[keys[0]])),
-            values: data.result.map(r => Number(r[keys[1]]) || 0),
-          };
-        }
+        const keys = Object.keys(data.result[0]);
+        if (keys.length >= 2) return { labels: data.result.map(r => String(r[keys[0]])), values: data.result.map(r => Number(r[keys[1]]) || 0) };
       }
     } catch {}
   }
   return { labels: [], values: [] };
 }
 
-function formatNum(n) {
-  if (n >= 1000) return "$" + n.toLocaleString();
-  return String(n);
-}
+function fmtNum(n) { return n >= 1000 ? "$" + n.toLocaleString() : String(n); }
 </script>
 
 </body>
