@@ -1,0 +1,61 @@
+date,category,product,revenue,units,price,margin_pct,returns,ad_spend
+2026-01-06,Electronics,iPhone Case,1250,125,10.00,62,3,180
+2026-01-06,Electronics,USB Hub,3400,85,40.00,45,2,320
+2026-01-06,Clothing,Winter Jacket,8900,89,100.00,38,12,950
+2026-01-06,Clothing,Wool Scarf,1560,78,20.00,55,4,120
+2026-01-06,Food,Protein Bar x12,2100,140,15.00,42,1,280
+2026-01-13,Electronics,iPhone Case,980,98,10.00,62,8,180
+2026-01-13,Electronics,USB Hub,4100,102,40.00,45,1,380
+2026-01-13,Clothing,Winter Jacket,6200,62,100.00,38,18,950
+2026-01-13,Clothing,Wool Scarf,1200,60,20.00,55,2,90
+2026-01-13,Food,Protein Bar x12,2450,163,15.00,42,0,310
+2026-01-20,Electronics,iPhone Case,1100,110,10.00,62,2,200
+2026-01-20,Electronics,USB Hub,2900,72,40.00,45,4,290
+2026-01-20,Clothing,Winter Jacket,11200,112,100.00,38,9,1100
+2026-01-20,Clothing,Wool Scarf,1800,90,20.00,55,1,140
+2026-01-20,Food,Protein Bar x12,1890,126,15.00,42,3,240
+2026-01-27,Electronics,iPhone Case,760,76,10.00,62,14,180
+2026-01-27,Electronics,USB Hub,3200,80,40.00,45,2,300
+2026-01-27,Clothing,Winter Jacket,4100,41,100.00,38,22,800
+2026-01-27,Clothing,Wool Scarf,900,45,20.00,55,6,80
+2026-01-27,Food,Protein Bar x12,3200,213,15.00,42,0,420
+2026-02-03,Electronics,iPhone Case,1350,135,10.00,62,1,210
+2026-02-03,Electronics,USB Hub,3800,95,40.00,45,3,360
+2026-02-03,Clothing,Winter Jacket,3200,32,100.00,38,28,600
+2026-02-03,Clothing,Wool Scarf,640,32,20.00,55,8,60
+2026-02-03,Food,Protein Bar x12,2800,187,15.00,42,2,350
+2026-02-10,Electronics,iPhone Case,1480,148,10.00,62,0,230
+2026-02-10,Electronics,USB Hub,4400,110,40.00,45,1,420
+2026-02-10,Clothing,Winter Jacket,2100,21,100.00,38,31,400
+2026-02-10,Clothing,Wool Scarf,420,21,20.00,55,9,40
+2026-02-10,Food,Protein Bar x12,3100,207,15.00,42,1,390
+2026-02-17,Electronics,iPhone Case,1620,162,10.00,62,2,250
+2026-02-17,Electronics,USB Hub,5100,127,40.00,45,0,490
+2026-02-17,Clothing,Winter Jacket,1400,14,100.00,38,35,280
+2026-02-17,Clothing,Wool Scarf,280,14,20.00,55,11,30
+2026-02-17,Food,Protein Bar x12,2650,177,15.00,42,4,330
+2026-02-24,Electronics,iPhone Case,1890,189,10.00,62,1,290
+2026-02-24,Electronics,USB Hub,4700,117,40.00,45,2,450
+2026-02-24,Clothing,Winter Jacket,800,8,100.00,38,38,160
+2026-02-24,Clothing,Wool Scarf,160,8,20.00,55,13,20
+2026-02-24,Food,Protein Bar x12,2400,160,15.00,42,2,300
+2026-03-03,Electronics,iPhone Case,2100,210,10.00,62,0,320
+2026-03-03,Electronics,USB Hub,4200,105,40.00,45,3,400
+2026-03-03,Clothing,Winter Jacket,600,6,100.00,38,40,120
+2026-03-03,Clothing,Wool Scarf,120,6,20.00,55,14,15
+2026-03-03,Food,Protein Bar x12,3800,253,15.00,42,0,480
+2026-03-10,Electronics,iPhone Case,2350,235,10.00,62,0,360
+2026-03-10,Electronics,USB Hub,3900,97,40.00,45,4,370
+2026-03-10,Clothing,Winter Jacket,400,4,100.00,38,42,80
+2026-03-10,Clothing,Wool Scarf,80,4,20.00,55,15,10
+2026-03-10,Food,Protein Bar x12,4200,280,15.00,42,0,530
+2026-03-17,Electronics,iPhone Case,2600,260,10.00,62,1,400
+2026-03-17,Electronics,USB Hub,3600,90,40.00,45,5,340
+2026-03-17,Clothing,Winter Jacket,200,2,100.00,38,44,40
+2026-03-17,Clothing,Wool Scarf,40,2,20.00,55,16,5
+2026-03-17,Food,Protein Bar x12,4800,320,15.00,42,0,600
+2026-03-24,Electronics,iPhone Case,2880,288,10.00,62,0,440
+2026-03-24,Electronics,USB Hub,3300,82,40.00,45,6,310
+2026-03-24,Clothing,Winter Jacket,100,1,100.00,38,45,20
+2026-03-24,Clothing,Wool Scarf,20,1,20.00,55,17,3
+2026-03-24,Food,Protein Bar x12,5200,347,15.00,42,1,650

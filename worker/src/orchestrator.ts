@@ -129,9 +129,10 @@ export class AnalysisOrchestrator implements DurableObject {
         "print(json.dumps({'schema': {'columns': columns, 'shape': [len(rows), len(columns)]}, 'sample': sample}))",
       ].join("\n");
 
+      // TODO_TEMP TD-003: увеличен до 25s — Judge0 CE иногда медленно стартует
       const schemaRun = await this.withTimeout(
         e2b.runCode(sandboxId, schemaCode),
-        15000, "schema detection"
+        25000, "schema detection"
       );
 
       let dataDescription = `CSV columns: ${csvContent.split('\n')[0]}`;
@@ -155,9 +156,10 @@ export class AnalysisOrchestrator implements DurableObject {
         let pythonCode = "";
         try {
           const prevResult = executionOutputs.length > 0 ? executionOutputs[executionOutputs.length - 1] : undefined;
+          // TODO_TEMP TD-003: 25s для Kimi/Claude
           pythonCode = await this.withTimeout(
             kimi.generatePython(dataDescription, question, prevResult, i),
-            20000, `kimi iteration ${i}`
+            25000, `kimi iteration ${i}`
           );
           console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.length} chars)`);
         } catch (err) {
@@ -168,9 +170,10 @@ export class AnalysisOrchestrator implements DurableObject {
 
         let execResult: any;
         try {
+          // TODO_TEMP TD-003: 25s для Judge0 — wall_time_limit=20s + network overhead
           execResult = await this.withTimeout(
             e2b.runCode(sandboxId, pythonCode),
-            15000, `e2b iteration ${i}`
+            25000, `e2b iteration ${i}`
           );
           console.log(`[${sessionId}] Iter ${i}: Executed, stdout=${execResult.stdout.slice(0, 100)}, error=${execResult.error}`);
         } catch (err) {
@@ -197,9 +200,10 @@ export class AnalysisOrchestrator implements DurableObject {
       });
 
       try {
+        // TODO_TEMP TD-003: 35s для финального summary
         result.summary = await this.withTimeout(
           kimi.generateFinalAnalysis(question, executionOutputs, language),
-          25000, "final summary"
+          35000, "final summary"
         );
         console.log(`[${sessionId}] Summary OK (${result.summary.length} chars)`);
       } catch (err) {
