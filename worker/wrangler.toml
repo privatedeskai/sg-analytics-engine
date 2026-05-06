@@ -5,8 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 upload_source_maps = false
 
 [vars]
-# TODO_TEMP TD-002: 5 iterations — DO CPU limit ~30s. Revert to 10 after TD-001 (Kimi K2.6)
-MAX_ITERATIONS = "5"
+# TD-001 CLOSED: switched to Kimi K2.6 via DeepInfra
+# TD-002 CLOSED: 10 iterations — Kimi K2.6 is fast enough (~2-3s per iteration)
+MAX_ITERATIONS = "10"
 
 [[durable_objects.bindings]]
 name = "ORCHESTRATOR"

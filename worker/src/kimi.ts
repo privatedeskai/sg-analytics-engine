@@ -9,6 +9,13 @@ export interface KimiResponse {
   pythonCode?: string;
 }
 
+export interface IterationResult {
+  python: string;
+  summary: string;
+  enough: boolean;
+  reason: string;
+}
+
 export class KimiClient {
   private apiKey: string;
   private baseUrl: string;
@@ -16,116 +23,118 @@ export class KimiClient {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    // TODO_TEMP TD-001: temporarily using Claude API instead of Kimi K2.6
-    // REVERT: baseUrl = 'https://api.deepinfra.com/v1/openai', model = 'moonshotai/Kimi-K2-Instruct'
-    // TRIGGER: top up DeepInfra balance (~$10), verify DEEPINFRA_API_KEY in Cloudflare secrets
-    this.baseUrl = 'https://api.anthropic.com/v1';
-    this.model = 'claude-sonnet-4-5';
+    // TD-001 CLOSED: switched to Kimi K2.6 via DeepInfra
+    this.baseUrl = 'https://api.deepinfra.com/v1/openai';
+    this.model = 'moonshotai/Kimi-K2.6';
   }
 
-  async generatePython(dataDescription: string, question: string, previousResult?: string, iteration?: number): Promise<string> {
-    // All prompts in English only — avoids any Cyrillic encoding issues in Python code generation
-    const systemPrompt = `You are a Python data analyst. Write clean, executable Python code to analyze data and answer questions.
+  // Generates Python code + summary + convergence signal in one call
+  // Returns structured IterationResult — orchestrator uses summary for next iteration context
+  async generateIteration(
+    dataDescription: string,
+    question: string,
+    iterationSummaries: string[], // summaries from previous iterations, NOT raw outputs
+    iteration: number,
+    maxIterations: number
+  ): Promise<IterationResult> {
+    const systemPrompt = `You are a Python data analyst working iteratively. Each iteration you:
+1. Write focused Python to test ONE specific hypothesis
+2. Summarize what you found in 1-2 sentences
+3. Decide if you have enough to answer the user's question
 
-CRITICAL CONSTRAINTS - Judge0 CE sandbox, Python stdlib only:
+CRITICAL CONSTRAINTS — Judge0 CE sandbox, Python stdlib only:
 - FORBIDDEN: pandas, numpy, matplotlib, scipy, sklearn, or ANY non-stdlib import
 - ALLOWED: csv, json, io, math, statistics, collections, itertools, functools, datetime, re, operator
 
-The CSV data is pre-loaded as a UTF-8 string in variable CSV_DATA (already defined, do not redefine it).
+CSV data is pre-loaded as UTF-8 string in variable CSV_DATA (already defined, do not redefine it).
+Parse CSV: import csv,json,io; reader=csv.DictReader(io.StringIO(CSV_DATA)); rows=list(reader)
+Output results: print(json.dumps({"result": ...}, ensure_ascii=False))
 
-Parse CSV like this:
-import csv, json, io
-reader = csv.DictReader(io.StringIO(CSV_DATA))
-rows = list(reader)
+Respond ONLY with valid JSON (no markdown, no backticks):
+{
+  "python": "<executable Python code, single line strings escaped>",
+  "summary": "<1-2 sentences: what this iteration found>",
+  "enough": <true if you can now fully answer the question, false otherwise>,
+  "reason": "<why enough or what's still missing>"
+}`;
 
-Always output results as valid JSON on a single line:
-print(json.dumps({"result": ...}, ensure_ascii=False))
+    const contextBlock = iterationSummaries.length > 0
+      ? `\n\nWhat we know so far:\n${iterationSummaries.map((s, i) => `Iteration ${i + 1}: ${s}`).join('\n')}`
+      : '';
 
-Return ONLY executable Python code. No explanations. No markdown. No triple backticks.`;
+    const iterNote = `(iteration ${iteration}/${maxIterations})`;
+    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} ${iterNote}${contextBlock}\n\nWrite focused Python for ONE specific check. Do not repeat previous analysis.`;
 
-    const iterNote = iteration ? ` (iteration ${iteration}/10)` : '';
-    const userMessage = previousResult
-      ? `Data schema:\n${dataDescription}\n\nQuestion: ${question}${iterNote}\n\nPrevious iteration output:\n${previousResult}\n\nBuild on the previous result. Go deeper. Return only Python code. No pandas. No markdown.`
-      : `Data schema:\n${dataDescription}\n\nQuestion: ${question}${iterNote}\n\nWrite Python code to analyze this data and answer the question. Return only Python code. No pandas. No markdown.`;
-
-    const response = await this.callAPI(systemPrompt, userMessage);
-    return this.extractCode(response);
+    const raw = await this.callAPI(systemPrompt, userMessage, 2000);
+    return this.parseIterationResult(raw);
   }
 
-  async generateFinalAnalysis(question: string, analysisResults: string[], language: string = 'en'): Promise<string> {
-    return this.generateFinalText(question, analysisResults, language);
-  }
-
-  async generateFinalText(question: string, analysisResults: string[], language: string = 'en'): Promise<string> {
+  async generateFinalAnalysis(question: string, summaries: string[], language: string = 'en'): Promise<string> {
     const langInstruction = language === 'ru'
       ? 'Respond in Russian. Be concise and business-focused. Use plain text, no markdown headers.'
       : 'Respond in English. Be concise and business-focused.';
 
-    const systemPrompt = `You are a business analyst. Synthesize data analysis results into clear insights and actionable recommendations. ${langInstruction}
+    const systemPrompt = `You are a business analyst. Synthesize data analysis findings into clear insights and actionable recommendations. ${langInstruction}
 Structure: 1-2 sentence summary, then key findings, then 1 concrete recommendation.`;
 
-    const userMessage = `Question: ${question}\n\nAnalysis results from ${analysisResults.length} iterations:\n${analysisResults.slice(0, 8).join('\n---\n')}`;
+    const userMessage = `Question: ${question}\n\nFindings from ${summaries.length} analysis iterations:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
 
-    return await this.callAPI(systemPrompt, userMessage);
+    return await this.callAPI(systemPrompt, userMessage, 1500);
   }
 
-  private async callAPI(systemPrompt: string, userMessage: string): Promise<string> {
-    const isAnthropic = this.baseUrl.includes('anthropic');
-
-    // Encode body as UTF-8 explicitly — handles Cyrillic and all Unicode correctly
-    const bodyStr = isAnthropic
-      ? JSON.stringify({
-          model: this.model,
-          max_tokens: 2000,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userMessage }],
-        })
-      : JSON.stringify({
-          model: this.model,
-          max_tokens: 2000,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
-        });
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json; charset=utf-8',
-    };
-
-    if (isAnthropic) {
-      headers['x-api-key'] = this.apiKey;
-      headers['anthropic-version'] = '2023-06-01';
-    } else {
-      headers['Authorization'] = `Bearer ${this.apiKey}`;
+  private parseIterationResult(raw: string): IterationResult {
+    try {
+      // Strip markdown fences if model added them despite instructions
+      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      return {
+        python: this.extractCode(parsed.python || ''),
+        summary: parsed.summary || 'No summary provided',
+        enough: Boolean(parsed.enough),
+        reason: parsed.reason || '',
+      };
+    } catch {
+      // Fallback: treat entire response as Python code, no early exit
+      console.error('[KimiClient] Failed to parse iteration JSON, falling back to raw code');
+      return {
+        python: this.extractCode(raw),
+        summary: 'Iteration completed (parse fallback)',
+        enough: false,
+        reason: 'JSON parse failed',
+      };
     }
+  }
 
-    const endpoint = isAnthropic
-      ? `${this.baseUrl}/messages`
-      : `${this.baseUrl}/chat/completions`;
+  private async callAPI(systemPrompt: string, userMessage: string, maxTokens: number = 2000): Promise<string> {
+    const bodyStr = JSON.stringify({
+      model: this.model,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0.6,
+    });
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
       body: bodyStr,
     });
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`API error ${response.status}: ${err}`);
+      throw new Error(`Kimi API error ${response.status}: ${err}`);
     }
 
     const data: any = await response.json();
-
-    if (isAnthropic) {
-      return data.content[0].text;
-    } else {
-      return data.choices[0].message.content;
-    }
+    return data.choices[0].message.content;
   }
 
   private extractCode(text: string): string {
-    // Strip markdown fences if model added them despite instructions
     const fenceMatch = text.match(/```(?:python)?\n?([\s\S]*?)```/);
     if (fenceMatch) return fenceMatch[1].trim();
     return text.trim();
