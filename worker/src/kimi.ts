@@ -25,7 +25,7 @@ export class KimiClient {
   ): Promise<IterationResult> {
     const systemPrompt = `You are a Python data analyst working iteratively. Each iteration you:
 1. Write focused Python to test ONE specific hypothesis
-2. Summarize what you found in 1-2 sentences
+2. Summarize what you found in max 30 words
 3. Decide if you have enough to answer the user question
 
 CRITICAL CONSTRAINTS — Judge0 CE sandbox, Python stdlib only:
@@ -42,20 +42,18 @@ Respond ONLY with valid JSON (no markdown, no backticks):
   "python": "<executable Python code, max 25 lines>",
   "summary": "<max 30 words: what this iteration found>",
   "enough": <true if you can now fully answer the question, false otherwise>,
-  "reason": "<max 20 words: why enough or what is still missing>"
+  "reason": "<max 20 words>"
 }`;
 
     const contextBlock = iterationSummaries.length > 0
-      ? `\n\nWhat we know so far:\n${iterationSummaries.map((s, i) => `Iteration ${i + 1}: ${s}`).join('\n')}`
+      ? `\n\nWhat we know so far:\n${iterationSummaries.map((s, i) => `Iter ${i + 1}: ${s}`).join('\n')}`
       : '';
 
-    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} (iteration ${iteration}/${maxIterations})${contextBlock}\n\nWrite focused Python for ONE specific check. Do not repeat previous analysis.`;
+    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} (iteration ${iteration}/${maxIterations})${contextBlock}\n\nOne hypothesis only. No repeat of previous analysis.`;
 
-    const systemTokensEst = Math.round(systemPrompt.length / 4);
-    const userTokensEst = Math.round(userMessage.length / 4);
-    console.log(`[KIMI:PROMPT] iter=${iteration} system_chars=${systemPrompt.length}(~${systemTokensEst}tok) user_chars=${userMessage.length}(~${userTokensEst}tok) total_est_tokens=${systemTokensEst + userTokensEst} summaries_count=${iterationSummaries.length}`);
+    console.log(`[KIMI:PROMPT] iter=${iteration} est_tokens=${Math.round((systemPrompt.length + userMessage.length) / 4)} summaries=${iterationSummaries.length}`);
 
-    const raw = await this.callAPIStreaming(systemPrompt, userMessage, 1500, `iter${iteration}`);
+    const raw = await this.callAPIStreaming(systemPrompt, userMessage, 2000, `iter${iteration}`);
     return this.parseIterationResult(raw, iteration);
   }
 
@@ -67,11 +65,9 @@ Respond ONLY with valid JSON (no markdown, no backticks):
     const systemPrompt = `You are a business analyst. Synthesize findings into clear insights and actionable recommendations. ${langInstruction}
 Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
 
-    const userMessage = `Question: ${question}\n\nFindings from ${summaries.length} analysis iterations:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+    const userMessage = `Question: ${question}\n\nFindings:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
 
-    console.log(`[KIMI:PROMPT] final system_chars=${systemPrompt.length} user_chars=${userMessage.length} est_tokens=${Math.round((systemPrompt.length + userMessage.length) / 4)}`);
-
-    return await this.callAPIStreaming(systemPrompt, userMessage, 800, 'final');
+    return await this.callAPIStreaming(systemPrompt, userMessage, 1000, 'final');
   }
 
   private async callAPIStreaming(
@@ -82,88 +78,55 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
   ): Promise<string> {
     const t0 = Date.now();
 
-    const body = JSON.stringify({
-      model: this.model,
-      max_tokens: maxTokens,
-      stream: true,
-      temperature: 1.0,
-      top_p: 1.0,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: maxTokens,
+        stream: true,
+        // Instant mode: отключаем thinking — модель отвечает напрямую без reasoning tokens
+        // Thinking mode потребляет все токены на рассуждение, не оставляя места для ответа
+        // Для возврата к Thinking mode: убрать thinking, поставить temperature=1.0, max_tokens>=16000
+        // См. DECISIONS.md раздел "Режим работы Kimi"
+        thinking: { type: 'disabled' },
+        temperature: 0.6,
+        top_p: 0.95,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+      }),
     });
-
-    console.log(`[KIMI:REQ] label=${label} model=${this.model} max_tokens=${maxTokens} body_bytes=${body.length}`);
-
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body,
-      });
-    } catch (err) {
-      console.error(`[KIMI:FETCH_ERROR] label=${label} error="${String(err)}" elapsed=${Date.now()-t0}ms`);
-      throw err;
-    }
-
-    const t1 = Date.now();
-    console.log(`[KIMI:RESP] label=${label} status=${response.status} elapsed_to_headers=${t1-t0}ms content-type=${response.headers.get('content-type')}`);
 
     if (!response.ok) {
       const err = await response.text();
-      console.error(`[KIMI:HTTP_ERROR] label=${label} status=${response.status} body=${err.slice(0, 200)}`);
+      console.error(`[KIMI:ERROR] label=${label} status=${response.status} body=${err.slice(0, 200)}`);
       throw new Error(`Kimi API error ${response.status}: ${err}`);
     }
+
+    const t1 = Date.now();
+    console.log(`[KIMI:RESP] label=${label} status=200 headers_ms=${t1 - t0}ms`);
 
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
     let buffer = '';
-    let chunkCount = 0;
-    let totalBytes = 0;
     let firstChunkMs: number | null = null;
-    let lastChunkMs = t1;
     let contentChunks = 0;
     let reasoningChunks = 0;
-    let doneReceived = false;
-    let parseErrors = 0;
 
     while (true) {
-      let readResult: ReadableStreamReadResult<Uint8Array>;
-      try {
-        readResult = await reader.read();
-      } catch (err) {
-        console.error(`[KIMI:READ_ERROR] label=${label} chunk=${chunkCount} elapsed=${Date.now()-t0}ms error="${String(err)}"`);
-        throw err;
-      }
-
-      const { done, value } = readResult;
-
-      if (done) {
-        console.log(`[KIMI:STREAM_DONE] label=${label} stream_closed elapsed=${Date.now()-t0}ms chunks=${chunkCount} bytes=${totalBytes}`);
-        break;
-      }
-
-      chunkCount++;
-      totalBytes += value.length;
-      const now = Date.now();
+      const { done, value } = await reader.read();
+      if (done) break;
 
       if (firstChunkMs === null) {
-        firstChunkMs = now - t0;
-        console.log(`[KIMI:FIRST_CHUNK] label=${label} TTFT=${firstChunkMs}ms bytes=${value.length}`);
+        firstChunkMs = Date.now() - t0;
+        console.log(`[KIMI:FIRST_CHUNK] label=${label} TTFT=${firstChunkMs}ms`);
       }
-
-      // Log slow chunks (gap > 3s between chunks)
-      const gapMs = now - lastChunkMs;
-      if (gapMs > 3000) {
-        console.log(`[KIMI:SLOW_CHUNK] label=${label} chunk=${chunkCount} gap=${gapMs}ms elapsed=${now-t0}ms`);
-      }
-      lastChunkMs = now;
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -171,83 +134,45 @@ Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        if (trimmed === 'data: [DONE]') {
-          doneReceived = true;
-          console.log(`[KIMI:DONE_SIGNAL] label=${label} elapsed=${Date.now()-t0}ms content_so_far=${fullContent.length}chars`);
-          continue;
-        }
-
-        if (!trimmed.startsWith('data: ')) {
-          // Non-data line — could be event: or comment
-          if (trimmed.startsWith('event:') || trimmed.startsWith(':')) {
-            console.log(`[KIMI:SSE_META] label=${label} line="${trimmed.slice(0, 80)}"`);
-          }
-          continue;
-        }
-
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
         try {
           const json = JSON.parse(trimmed.slice(6));
           const delta = json.choices?.[0]?.delta;
-          const finishReason = json.choices?.[0]?.finish_reason;
-
-          if (delta?.content) {
-            fullContent += delta.content;
-            contentChunks++;
-          }
-
-          // Detect reasoning/thinking tokens
+          if (delta?.content) { fullContent += delta.content; contentChunks++; }
           if (delta?.reasoning_content) {
             reasoningChunks++;
             if (reasoningChunks === 1) {
-              console.log(`[KIMI:THINKING_DETECTED] label=${label} model is using thinking mode — reasoning tokens present`);
+              console.warn(`[KIMI:THINKING_LEAK] label=${label} reasoning tokens present despite disabled — check API support`);
             }
           }
-
-          if (finishReason && finishReason !== 'null') {
-            console.log(`[KIMI:FINISH] label=${label} finish_reason=${finishReason} elapsed=${Date.now()-t0}ms`);
-          }
-
-          // Log usage stats if present
           if (json.usage) {
-            console.log(`[KIMI:USAGE] label=${label} prompt_tokens=${json.usage.prompt_tokens} completion_tokens=${json.usage.completion_tokens} total=${json.usage.total_tokens}`);
+            console.log(`[KIMI:USAGE] label=${label} prompt=${json.usage.prompt_tokens} completion=${json.usage.completion_tokens} total=${json.usage.total_tokens}`);
           }
-
-        } catch (e) {
-          parseErrors++;
-          if (parseErrors <= 3) {
-            console.log(`[KIMI:PARSE_ERR] label=${label} chunk=${chunkCount} raw="${trimmed.slice(0, 100)}"`);
-          }
-        }
+        } catch { /* skip malformed chunks */ }
       }
     }
 
     const totalMs = Date.now() - t0;
-    console.log(`[KIMI:COMPLETE] label=${label} total_ms=${totalMs} TTFT=${firstChunkMs}ms content_chars=${fullContent.length} content_chunks=${contentChunks} reasoning_chunks=${reasoningChunks} parse_errors=${parseErrors} done_received=${doneReceived} total_sse_chunks=${chunkCount} total_bytes=${totalBytes}`);
-
-    if (fullContent.length === 0) {
-      console.error(`[KIMI:EMPTY_RESPONSE] label=${label} got zero content chars — reasoning_chunks=${reasoningChunks} parse_errors=${parseErrors}`);
-    }
+    console.log(`[KIMI:COMPLETE] label=${label} total_ms=${totalMs} TTFT=${firstChunkMs}ms content_chars=${fullContent.length} content_chunks=${contentChunks} reasoning_chunks=${reasoningChunks}`);
 
     return fullContent.trim();
   }
 
   private parseIterationResult(raw: string, iteration: number): IterationResult {
-    console.log(`[KIMI:PARSE] iter=${iteration} raw_chars=${raw.length} raw_preview="${raw.slice(0, 150).replace(/\n/g, '\\n')}"`);
     try {
       const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(clean);
       const result = {
         python: this.extractCode(parsed.python || ''),
-        summary: parsed.summary || 'No summary provided',
+        summary: (parsed.summary || 'No summary').slice(0, 200),
         enough: Boolean(parsed.enough),
-        reason: parsed.reason || '',
+        reason: (parsed.reason || '').slice(0, 100),
       };
-      console.log(`[KIMI:PARSE_OK] iter=${iteration} python_chars=${result.python.length} summary_words=${result.summary.split(' ').length} enough=${result.enough}`);
+      console.log(`[KIMI:PARSE_OK] iter=${iteration} python_chars=${result.python.length} enough=${result.enough}`);
       return result;
     } catch (e) {
-      console.error(`[KIMI:PARSE_FAIL] iter=${iteration} error="${String(e)}" raw_chars=${raw.length} raw_full="${raw.slice(0, 300).replace(/\n/g, '\\n')}"`);
+      console.error(`[KIMI:PARSE_FAIL] iter=${iteration} error="${String(e)}" raw="${raw.slice(0, 200)}"`);
       return {
         python: this.extractCode(raw),
         summary: 'Iteration completed (parse fallback)',
