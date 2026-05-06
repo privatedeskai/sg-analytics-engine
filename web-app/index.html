@@ -425,6 +425,8 @@ body::after {
 
 <script>
 const WORKER_URL = "https://sg-analytics-engine.dorofeevov17.workers.dev";
+// TODO_TEMP TD-002: maxIterations=5 — DO CPU limit. Revert to 10 after TD-001 (Kimi K2.6)
+const MAX_ITERATIONS = 5;
 
 let csvContent = null, isAnalyzing = false, currentChart = null;
 
@@ -494,26 +496,27 @@ async function startAnalysis(question) {
   dashLiveText.textContent = "Запуск...";
   addMsg("user", question);
   addMsg("prog", "Запускаю анализ...");
-  showProgress(0, 10, "Инициализация...");
+  showProgress(0, MAX_ITERATIONS, "Инициализация...");
 
   let sessionId;
   try {
     const r = await fetch(`${WORKER_URL}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: 10, language: "ru" }),
+      // TODO_TEMP TD-002: maxIterations=5. Revert to 10 after TD-001
+      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: MAX_ITERATIONS, language: "ru" }),
     });
     sessionId = (await r.json()).sessionId;
   } catch { delProg(); addMsg("err","Не удалось подключиться к серверу."); reset(); return; }
 
   let attempts = 0;
-  // FIX: 300 попыток × 2 сек = 10 минут — достаточно для 10 итераций
+  // 300 попыток × 2 сек = 10 минут — достаточно с запасом
   const poll = setInterval(async () => {
     if (++attempts > 300) { clearInterval(poll); delProg(); addMsg("err","Анализ занял слишком долго. Попробуй снова."); reset(); return; }
     try {
       const data = await (await fetch(`${WORKER_URL}/result/${sessionId}`)).json();
       if (data.status === "running") {
-        const iter = data.iteration||0, total = data.total||10, msg = data.message||"Анализирую...";
+        const iter = data.iteration||0, total = data.total||MAX_ITERATIONS, msg = data.message||"Анализирую...";
         updProg(`${msg} (${iter}/${total})`);
         showProgress(iter, total, msg);
         dashLiveText.textContent = `Итерация ${iter} / ${total}`;

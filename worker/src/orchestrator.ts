@@ -41,6 +41,15 @@ interface Env {
   CLAUDE_API_KEY: string;
 }
 
+// TODO_TEMP TD-002: 5 iterations — DO CPU limit. Revert to 10 after TD-001 (Kimi K2.6)
+const MAX_ITERATIONS = 5;
+
+// TODO_TEMP TD-003: Kimi timeout 25s — Claude is slower than Kimi K2.6 (iter 3 timed out at 15s)
+// iter_2 took 14s for Claude alone. Revert to 15s after TD-001.
+const KIMI_TIMEOUT_MS = 25000;
+const JUDGE0_TIMEOUT_MS = 15000;
+const SUMMARY_TIMEOUT_MS = 25000;
+
 export class AnalysisOrchestrator implements DurableObject {
   private state: DurableObjectState;
   private env: Env;
@@ -55,6 +64,7 @@ export class AnalysisOrchestrator implements DurableObject {
 
     if (url.pathname === "/analyze" && request.method === "POST") {
       const body = await request.json() as AnalysisRequest;
+      console.log(`[ORCHESTRATOR] fetch /analyze — sessionId=${body.sessionId} maxIterations_from_client=${body.maxIterations} USING_maxIter=${MAX_ITERATIONS}`);
       this.state.waitUntil(this.runAnalysis(body));
       return Response.json({ sessionId: body.sessionId, status: "started" });
     }
@@ -64,13 +74,14 @@ export class AnalysisOrchestrator implements DurableObject {
 
   private async saveStatus(status: SessionStatus): Promise<void> {
     try {
+      console.log(`[KV:write] session=${status.sessionId} status=${status.status} iter=${status.iteration}/${status.total} msg="${status.message}"`);
       await this.env.KV.put(
         `session:${status.sessionId}`,
         JSON.stringify(status),
         { expirationTtl: 86400 }
       );
     } catch (err) {
-      console.error("KV write error:", err);
+      console.error(`[KV:write:ERROR] session=${status.sessionId}`, err);
     }
   }
 
@@ -94,12 +105,12 @@ export class AnalysisOrchestrator implements DurableObject {
 
   private async runAnalysis(req: AnalysisRequest): Promise<void> {
     const startTime = Date.now();
-    // TODO_TEMP TD-002: max 5 iterations — DO CPU limit ~30s per iteration pair
-    // REVERT to 10 after switching to Kimi K2.6 (faster) — TD-001
-    const maxIter = 5;
+    // TODO_TEMP TD-002: hardcoded 5 — ignores req.maxIterations to stay within DO CPU limit
+    // REVERT: change MAX_ITERATIONS = 10 after TD-001 (Kimi K2.6 on DeepInfra)
+    const maxIter = MAX_ITERATIONS;
     const { sessionId, question, csvContent, language = "en" } = req;
 
-    console.log(`[${sessionId}] Starting analysis, maxIter=${maxIter}`);
+    console.log(`[ANALYSIS:START] session=${sessionId} maxIter=${maxIter} kimi_timeout=${KIMI_TIMEOUT_MS}ms question="${question.slice(0,60)}"`);
 
     const e2b = new E2BClient(this.env.E2B_API_KEY);
     const kimi = new KimiClient(this.env.CLAUDE_API_KEY);
@@ -116,11 +127,14 @@ export class AnalysisOrchestrator implements DurableObject {
         startedAt: new Date().toISOString(), question,
       });
 
+      console.log(`[E2B] Creating sandbox...`);
       const sandboxId = await e2b.createSandbox(180000);
+      console.log(`[E2B] Sandbox created: ${sandboxId}`);
+
       await e2b.uploadCSV(sandboxId, csvContent);
+      console.log(`[E2B] CSV uploaded (${csvContent.length} bytes)`);
 
       // Schema detection
-      console.log(`[${sessionId}] Getting schema...`);
       const schemaCode = [
         "import csv, json, io",
         "reader = csv.DictReader(io.StringIO(CSV_DATA))",
@@ -130,24 +144,28 @@ export class AnalysisOrchestrator implements DurableObject {
         "print(json.dumps({'schema': {'columns': columns, 'shape': [len(rows), len(columns)]}, 'sample': sample}))",
       ].join("\n");
 
+      console.log(`[SCHEMA] Running schema detection...`);
       const schemaRun = await this.withTimeout(
         e2b.runCode(sandboxId, schemaCode),
         15000, "schema detection"
       );
+      console.log(`[SCHEMA] stdout=${schemaRun.stdout.slice(0,120)} error=${schemaRun.error}`);
 
       let dataDescription = `CSV columns: ${csvContent.split('\n')[0]}`;
       try {
         const parsed = JSON.parse(schemaRun.stdout) as any;
         dataDescription = `Schema: ${JSON.stringify(parsed.schema)}\nSample: ${JSON.stringify(parsed.sample)}`;
-        console.log(`[${sessionId}] Schema OK`);
+        console.log(`[SCHEMA] OK — columns=${JSON.stringify(parsed.schema?.columns)} rows=${parsed.schema?.shape?.[0]}`);
       } catch {
-        console.log(`[${sessionId}] Schema parse failed, using header`);
+        console.log(`[SCHEMA] Parse failed — using CSV header fallback`);
       }
 
       const executionOutputs: string[] = [];
 
       for (let i = 1; i <= maxIter; i++) {
-        console.log(`[${sessionId}] Iteration ${i}/${maxIter} start`);
+        const iterStart = Date.now();
+        console.log(`[ITER:${i}/${maxIter}] ===== START ===== elapsed=${Date.now()-startTime}ms`);
+
         await this.saveStatus({
           sessionId, iteration: i, total: maxIter,
           message: this.getIterationMessage(i, maxIter), status: "running", question,
@@ -158,27 +176,29 @@ export class AnalysisOrchestrator implements DurableObject {
           const prevResult = executionOutputs.length > 0
             ? executionOutputs[executionOutputs.length - 1]
             : undefined;
+          console.log(`[ITER:${i}] Calling Claude for Python (timeout=${KIMI_TIMEOUT_MS}ms)...`);
           pythonCode = await this.withTimeout(
             kimi.generatePython(dataDescription, question, prevResult, i),
-            15000, `kimi iteration ${i}`
+            KIMI_TIMEOUT_MS, `kimi iteration ${i}`
           );
-          console.log(`[${sessionId}] Iter ${i}: Python generated (${pythonCode.length} chars)`);
+          console.log(`[ITER:${i}] Python generated — ${pythonCode.length} chars, elapsed=${Date.now()-iterStart}ms`);
         } catch (err) {
-          console.error(`[${sessionId}] Kimi error iter ${i}:`, err);
+          console.error(`[ITER:${i}] Claude TIMEOUT/ERROR: ${String(err)}`);
           executionOutputs.push(`Kimi error: ${String(err)}`);
           break;
         }
 
         let execResult: any;
         try {
+          console.log(`[ITER:${i}] Running code in Judge0...`);
           execResult = await this.withTimeout(
             e2b.runCode(sandboxId, pythonCode),
-            15000, `e2b iteration ${i}`
+            JUDGE0_TIMEOUT_MS, `e2b iteration ${i}`
           );
-          console.log(`[${sessionId}] Iter ${i}: stdout=${execResult.stdout.slice(0, 80)}, error=${execResult.error}`);
+          console.log(`[ITER:${i}] Judge0 done — stdout=${execResult.stdout.slice(0,100)} error=${execResult.error} execTime=${execResult.executionTime}ms total_elapsed=${Date.now()-iterStart}ms`);
         } catch (err) {
           execResult = { stdout: "", stderr: String(err), error: String(err), executionTime: 0 };
-          console.error(`[${sessionId}] E2B timeout iter ${i}:`, err);
+          console.error(`[ITER:${i}] Judge0 TIMEOUT/ERROR: ${String(err)}`);
         }
 
         const output = execResult.error
@@ -191,9 +211,11 @@ export class AnalysisOrchestrator implements DurableObject {
         const parsed = formatter.parseExecutionResult(output);
         if (parsed.metrics.length > 0) result.metrics = parsed.metrics;
         if (parsed.charts.length > 0) result.charts = parsed.charts;
+
+        console.log(`[ITER:${i}/${maxIter}] ===== END ===== iter_elapsed=${Date.now()-iterStart}ms total_elapsed=${Date.now()-startTime}ms`);
       }
 
-      console.log(`[${sessionId}] Generating final summary...`);
+      console.log(`[SUMMARY] Generating final summary (timeout=${SUMMARY_TIMEOUT_MS}ms)... total_elapsed=${Date.now()-startTime}ms`);
       await this.saveStatus({
         sessionId, iteration: maxIter, total: maxIter,
         message: "Generating final summary...", status: "running", question,
@@ -202,11 +224,11 @@ export class AnalysisOrchestrator implements DurableObject {
       try {
         result.summary = await this.withTimeout(
           kimi.generateFinalAnalysis(question, executionOutputs, language),
-          20000, "final summary"
+          SUMMARY_TIMEOUT_MS, "final summary"
         );
-        console.log(`[${sessionId}] Summary OK (${result.summary.length} chars)`);
+        console.log(`[SUMMARY] OK — ${result.summary.length} chars`);
       } catch (err) {
-        console.error(`[${sessionId}] Summary timeout:`, err);
+        console.error(`[SUMMARY] TIMEOUT/ERROR: ${String(err)}`);
         result.summary = executionOutputs
           .filter(o => !o.startsWith("ERROR"))
           .slice(-2)
@@ -214,7 +236,7 @@ export class AnalysisOrchestrator implements DurableObject {
       }
 
       result.durationMs = Date.now() - startTime;
-      console.log(`[${sessionId}] COMPLETED in ${result.durationMs}ms`);
+      console.log(`[ANALYSIS:COMPLETE] session=${sessionId} durationMs=${result.durationMs} iterations=${result.iterations.length}`);
 
       await this.saveStatus({
         sessionId, iteration: maxIter, total: maxIter,
@@ -224,7 +246,7 @@ export class AnalysisOrchestrator implements DurableObject {
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[${sessionId}] FATAL ERROR:`, errMsg);
+      console.error(`[ANALYSIS:FATAL] session=${sessionId} error="${errMsg}" elapsed=${Date.now()-startTime}ms`);
       result.error = errMsg;
       result.durationMs = Date.now() - startTime;
       await this.saveStatus({
