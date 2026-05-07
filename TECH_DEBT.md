@@ -7,38 +7,45 @@
 
 ## АКТИВНЫЕ ДОЛГИ
 
-### TD-001 | Claude API вместо Kimi K2.6
-- **Файл:** worker/src/kimi.ts, строки с baseUrl и model
+### TD-001 | Kimi K2.6 через gonka-openai SDK — не подключён
+- **Файл:** worker/src/kimi.ts
 - **Маркер в коде:** `// TODO_TEMP TD-001`
-- **Текущее:** claude-sonnet-4-5 через Anthropic API
-- **Вернуть:** baseUrl = 'https://api.deepinfra.com/v1/openai', model = 'moonshotai/Kimi-K2-Instruct'
-- **Триггер возврата:** Пополнить баланс DeepInfra (~$10) → проверить DEEPINFRA_API_KEY в Cloudflare secrets
-- **Влияние:** Стоимость в 20 раз выше при масштабе; медленнее чем Kimi
+- **Текущее:** Kimi K2.5 на DeepInfra — thinking mode не отключается, итерации 2+ возвращают пустой ответ
+- **Причина проблемы:** DeepInfra игнорирует параметр `thinking: {type: "disabled"}`. Модель тратит все токены (max_tokens=1500) на reasoning_content, на реальный ответ не остаётся ничего.
+- **Что сделать:**
+  1. Установить inferenced CLI и сгенерировать ECDSA ключевую пару
+  2. Добавить GONKA_PRIVATE_KEY в Cloudflare secrets
+  3. `npm install gonka-openai` в worker/
+  4. Переписать kimi.ts на gonka-openai TypeScript SDK
+- **Почему gonka-openai:** SDK работает с Kimi K2.6 напрямую без ограничений DeepInfra. nodejs_compat=true уже включён в wrangler.toml. Запасной путь — @noble/curves для ручной ECDSA подписи.
+- **Триггер:** Получить GONKA_PRIVATE_KEY через inferenced CLI
+- **Влияние:** Pipeline не работает стабильно. Только итерация 1 иногда проходит, остальные — пустой ответ.
 
-### TD-002 | MAX_ITERATIONS = 5 вместо 10
-- **Файл:** worker/src/orchestrator.ts, константа maxIter
-- **Маркер в коде:** `// TODO_TEMP TD-002`
-- **Текущее:** Жёсткий cap на 5 итераций
-- **Вернуть:** maxIter = 10 после переключения на Kimi K2.6 (TD-001) — Kimi быстрее, укладывается в DO CPU лимит
-- **Триггер возврата:** После закрытия TD-001
-- **Влияние:** Качество анализа ниже — 5 итераций вместо 10
-
-### TD-003 | Таймауты 15s в orchestrator.ts
-- **Файл:** worker/src/orchestrator.ts, метод withTimeout
+### TD-003 | Таймауты в orchestrator.ts
+- **Файл:** worker/src/orchestrator.ts, константы KIMI_TIMEOUT_MS, JUDGE0_TIMEOUT_MS
 - **Маркер в коде:** `// TODO_TEMP TD-003`
-- **Текущее:** Schema 15s, Kimi 15s, Judge0 15s, summary 20s
-- **Вернуть:** Оценить после стабилизации — возможно оставить как есть
-- **Триггер возврата:** После 3 успешных тестов подряд
-- **Влияние:** При медленном Judge0 или Claude анализ может обрываться
+- **Текущее:** KIMI_TIMEOUT_MS=30000, JUDGE0_TIMEOUT_MS=15000
+- **После TD-001:** Kimi K2.6 через Gonka будет быстрее — оценить нужно ли снижать таймауты
+- **Триггер:** После 3 успешных тестов подряд с gonka-openai SDK
+- **Влияние:** Минимальное — таймауты с запасом, не мешают работе
 
 ---
 
 ## ЗАКРЫТЫЕ ДОЛГИ
 
 ### TD-000 | Piston API → Judge0 CE | Закрыто 2026-05-05
-- **Было:** Piston API (emkc.org) — закрылся 15.02.2026
-- **Стало:** Judge0 CE (ce.judge0.com) — без ключа, без карты
+- Piston API закрылся 15.02.2026 → Judge0 CE (ce.judge0.com), без ключа
 
-### TD-004 | btoa/atob не поддерживают Unicode | Закрыто 2026-05-06
-- **Было:** btoa(csvContent) падал на кириллице и Unicode
-- **Стало:** TextEncoder/TextDecoder — корректная работа с любым Unicode
+### TD-002 | MAX_ITERATIONS | Закрыто 2026-05-06
+- Было: MAX_ITERATIONS=5 из-за DO CPU лимита при медленном Claude
+- Стало: MAX_ITERATIONS=10 — алгоритм Вариант 2 с ранним выходом решает проблему
+- wrangler.toml: MAX_ITERATIONS="5" (в vars) — это только переменная окружения, не используется в логике
+- В коде: константа MAX_ITERATIONS=10 в orchestrator.ts
+
+### TD-004 | btoa/atob Unicode | Закрыто 2026-05-06
+- btoa падал на кириллице → TextEncoder/TextDecoder
+
+### TD-005 | thinking mode на DeepInfra | Закрыто диагностикой 2026-05-06
+- Диагностика показала: DeepInfra не поддерживает thinking:disabled для Kimi
+- Решение: переход на gonka-openai SDK (TD-001)
+- Не использовать DeepInfra для Kimi K2.5/K2.6
