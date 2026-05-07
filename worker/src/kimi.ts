@@ -1,190 +1,265 @@
-export interface IterationResult {
-  python: string;
-  summary: string;
-  enough: boolean;
-  reason: string;
+// kimi.ts — Kimi K2.6 через gonka-openai TypeScript SDK
+// TD-001: ЗАКРЫТ — DeepInfra заменён на Gonka SDK
+// Instant mode: thinking disabled, temperature=0.6
+
+import { GonkaOpenAI } from 'gonka-openai';
+
+export interface KimiMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
 }
 
-export class KimiClient {
-  private apiKey: string;
-  private baseUrl: string;
-  private model: string;
+export interface KimiResponse {
+  content: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+}
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-    this.baseUrl = 'https://api.deepinfra.com/v1/openai';
-    this.model = 'moonshotai/Kimi-K2.5';
-  }
+export interface PlannerResult {
+  hypothesis: string;
+  python_code: string;
+}
 
-  async generateIteration(
-    dataDescription: string,
-    question: string,
-    iterationSummaries: string[],
-    iteration: number,
-    maxIterations: number
-  ): Promise<IterationResult> {
-    const systemPrompt = `You are a Python data analyst working iteratively. Each iteration you:
-1. Write focused Python to test ONE specific hypothesis
-2. Summarize what you found in max 30 words
-3. Decide if you have enough to answer the user question
+export interface EvaluatorResult {
+  summary: string;
+  enough: boolean;
+  next_hypothesis?: string;
+}
 
-CRITICAL CONSTRAINTS — Judge0 CE sandbox, Python stdlib only:
-- FORBIDDEN: pandas, numpy, matplotlib, scipy, sklearn, or ANY non-stdlib import
-- ALLOWED: csv, json, io, math, statistics, collections, itertools, functools, datetime, re, operator
-- Write LESS THAN 25 lines of Python
+export interface FinalSummaryResult {
+  summary: string;
+  recommendations: string[];
+  kpis: Record<string, string | number>;
+}
 
-CSV data is pre-loaded as UTF-8 string in variable CSV_DATA (already defined, do not redefine it).
-Parse CSV: import csv,json,io; reader=csv.DictReader(io.StringIO(CSV_DATA)); rows=list(reader)
-Output results: print(json.dumps({"result": ...}, ensure_ascii=False))
+function getClient(gonkaPrivateKey: string): GonkaOpenAI {
+  return new GonkaOpenAI({
+    gonkaPrivateKey,
+    apiKey: 'mock-api-key',
+  });
+}
 
-Respond ONLY with valid JSON (no markdown, no backticks):
+async function callKimi(
+  client: GonkaOpenAI,
+  messages: KimiMessage[],
+  maxTokens: number = 2000
+): Promise<KimiResponse> {
+  const response = await client.chat.completions.create({
+    model: 'kimi-k2',
+    messages,
+    max_tokens: maxTokens,
+    temperature: 0.6,
+    // Instant mode — no thinking parameter needed with gonka-openai SDK
+  });
+
+  const content = response.choices?.[0]?.message?.content ?? '';
+  const usage = response.usage
+    ? {
+        prompt_tokens: response.usage.prompt_tokens,
+        completion_tokens: response.usage.completion_tokens,
+      }
+    : undefined;
+
+  console.log(`[kimi] tokens: prompt=${usage?.prompt_tokens} completion=${usage?.completion_tokens} content_len=${content.length}`);
+
+  return { content, usage };
+}
+
+// ── PLANNER+CODER ──────────────────────────────────────────────────────────────
+// Принимает описание данных + предыдущие резюме, возвращает гипотезу и Python код
+
+export async function runPlanner(
+  gonkaPrivateKey: string,
+  dataDescription: string,
+  userQuestion: string,
+  previousSummaries: string[],
+  iteration: number
+): Promise<PlannerResult> {
+  const client = getClient(gonkaPrivateKey);
+
+  const summariesBlock = previousSummaries.length > 0
+    ? `\nПредыдущие итерации (краткие резюме):\n${previousSummaries.map((s, i) => `  [${i + 1}] ${s}`).join('\n')}`
+    : '';
+
+  const messages: KimiMessage[] = [
+    {
+      role: 'system',
+      content: `Ты — аналитический агент. Твоя задача: написать Python код для анализа данных.
+Отвечай СТРОГО в JSON формате без markdown, без пояснений:
 {
-  "python": "<executable Python code, max 25 lines>",
-  "summary": "<max 30 words: what this iteration found>",
-  "enough": <true if you can now fully answer the question, false otherwise>,
-  "reason": "<max 20 words>"
-}`;
+  "hypothesis": "одно предложение — что именно проверяем",
+  "python_code": "весь Python код одной строкой с \\n для переносов"
+}
 
-    const contextBlock = iterationSummaries.length > 0
-      ? `\n\nWhat we know so far:\n${iterationSummaries.map((s, i) => `Iter ${i + 1}: ${s}`).join('\n')}`
-      : '';
+Правила для Python кода:
+- Данные уже загружены как переменная df (pandas DataFrame)
+- Используй только: pandas, numpy — они доступны
+- Выводи результаты через print()
+- Код должен быть самодостаточным и завершаться без ошибок
+- НЕ читай файлы — df уже есть`,
+    },
+    {
+      role: 'user',
+      content: `Вопрос пользователя: ${userQuestion}
 
-    const userMessage = `Data schema:\n${dataDescription}\n\nQuestion: ${question} (iteration ${iteration}/${maxIterations})${contextBlock}\n\nOne hypothesis only. No repeat of previous analysis.`;
+Описание данных:
+${dataDescription}
+${summariesBlock}
 
-    console.log(`[KIMI:PROMPT] iter=${iteration} est_tokens=${Math.round((systemPrompt.length + userMessage.length) / 4)} summaries=${iterationSummaries.length}`);
+Итерация: ${iteration}
+${iteration === 1 ? 'Начни с базовой статистики и структуры данных.' : 'Углубись в анализ на основе предыдущих резюме. Проверь новую гипотезу.'}
 
-    const raw = await this.callAPIStreaming(systemPrompt, userMessage, 2000, `iter${iteration}`);
-    return this.parseIterationResult(raw, iteration);
+Напиши гипотезу и Python код для её проверки.`,
+    },
+  ];
+
+  const result = await callKimi(client, messages, 2000);
+
+  try {
+    const clean = result.content.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      hypothesis: parsed.hypothesis ?? 'Анализ данных',
+      python_code: parsed.python_code ?? 'print(df.describe())',
+    };
+  } catch (e) {
+    console.error('[kimi] planner parse error:', e, 'raw:', result.content.slice(0, 200));
+    // Fallback: извлечь код если JSON сломан
+    return {
+      hypothesis: `Итерация ${iteration}: базовый анализ`,
+      python_code: 'print(df.head())\nprint(df.describe())\nprint(df.dtypes)',
+    };
   }
+}
 
-  async generateFinalAnalysis(question: string, summaries: string[], language: string = 'ru'): Promise<string> {
-    const langInstruction = language === 'ru'
-      ? 'Respond in Russian. Be concise and business-focused. Use plain text, no markdown headers.'
-      : 'Respond in English. Be concise and business-focused.';
+// ── EVALUATOR ──────────────────────────────────────────────────────────────────
+// Принимает вывод Python, решает достаточно ли данных для финального ответа
 
-    const systemPrompt = `You are a business analyst. Synthesize findings into clear insights and actionable recommendations. ${langInstruction}
-Structure: 1-2 sentence summary, key findings, 1 concrete recommendation.`;
+export async function runEvaluator(
+  gonkaPrivateKey: string,
+  userQuestion: string,
+  executionOutput: string,
+  previousSummaries: string[],
+  iteration: number,
+  maxIterations: number
+): Promise<EvaluatorResult> {
+  const client = getClient(gonkaPrivateKey);
 
-    const userMessage = `Question: ${question}\n\nFindings:\n${summaries.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+  const messages: KimiMessage[] = [
+    {
+      role: 'system',
+      content: `Ты — оценщик результатов анализа. Отвечай СТРОГО в JSON формате без markdown:
+{
+  "summary": "краткое резюме результата этой итерации, 20-40 слов",
+  "enough": true или false,
+  "next_hypothesis": "что проверить дальше (только если enough=false)"
+}
 
-    return await this.callAPIStreaming(systemPrompt, userMessage, 1000, 'final');
+enough=true если:
+- Найден чёткий ответ на вопрос пользователя
+- Выявлены конкретные паттерны/аномалии с числами
+- Дальнейший анализ не даст новой информации`,
+    },
+    {
+      role: 'user',
+      content: `Вопрос пользователя: ${userQuestion}
+
+Результат выполнения кода (итерация ${iteration}/${maxIterations}):
+${executionOutput.slice(0, 2000)}
+
+Предыдущие резюме:
+${previousSummaries.map((s, i) => `[${i + 1}] ${s}`).join('\n') || 'нет'}
+
+Оцени: достаточно ли данных для ответа пользователю?`,
+    },
+  ];
+
+  const result = await callKimi(client, messages, 800);
+
+  try {
+    const clean = result.content.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      summary: parsed.summary ?? `Итерация ${iteration} завершена`,
+      enough: parsed.enough === true,
+      next_hypothesis: parsed.next_hypothesis,
+    };
+  } catch (e) {
+    console.error('[kimi] evaluator parse error:', e);
+    return {
+      summary: `Итерация ${iteration}: данные получены`,
+      enough: iteration >= maxIterations - 1,
+    };
   }
+}
 
-  private async callAPIStreaming(
-    systemPrompt: string,
-    userMessage: string,
-    maxTokens: number,
-    label: string
-  ): Promise<string> {
-    const t0 = Date.now();
+// ── FINAL SUMMARY ──────────────────────────────────────────────────────────────
+// Финальный отчёт на основе всех резюме итераций
 
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Authorization': `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        max_tokens: maxTokens,
-        stream: true,
-        // Instant mode: отключаем thinking — модель отвечает напрямую без reasoning tokens
-        // Thinking mode потребляет все токены на рассуждение, не оставляя места для ответа
-        // Для возврата к Thinking mode: убрать thinking, поставить temperature=1.0, max_tokens>=16000
-        // См. DECISIONS.md раздел "Режим работы Kimi"
-        thinking: { type: 'disabled' },
-        temperature: 0.6,
-        top_p: 0.95,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-      }),
-    });
+export async function runFinalSummary(
+  gonkaPrivateKey: string,
+  userQuestion: string,
+  allSummaries: string[],
+  allOutputs: string[]
+): Promise<FinalSummaryResult> {
+  const client = getClient(gonkaPrivateKey);
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error(`[KIMI:ERROR] label=${label} status=${response.status} body=${err.slice(0, 200)}`);
-      throw new Error(`Kimi API error ${response.status}: ${err}`);
-    }
+  const combinedOutputs = allOutputs
+    .map((o, i) => `[Итерация ${i + 1}]\n${o.slice(0, 500)}`)
+    .join('\n\n');
 
-    const t1 = Date.now();
-    console.log(`[KIMI:RESP] label=${label} status=200 headers_ms=${t1 - t0}ms`);
-
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
-    let buffer = '';
-    let firstChunkMs: number | null = null;
-    let contentChunks = 0;
-    let reasoningChunks = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      if (firstChunkMs === null) {
-        firstChunkMs = Date.now() - t0;
-        console.log(`[KIMI:FIRST_CHUNK] label=${label} TTFT=${firstChunkMs}ms`);
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed === 'data: [DONE]') continue;
-        if (!trimmed.startsWith('data: ')) continue;
-        try {
-          const json = JSON.parse(trimmed.slice(6));
-          const delta = json.choices?.[0]?.delta;
-          if (delta?.content) { fullContent += delta.content; contentChunks++; }
-          if (delta?.reasoning_content) {
-            reasoningChunks++;
-            if (reasoningChunks === 1) {
-              console.warn(`[KIMI:THINKING_LEAK] label=${label} reasoning tokens present despite disabled — check API support`);
-            }
-          }
-          if (json.usage) {
-            console.log(`[KIMI:USAGE] label=${label} prompt=${json.usage.prompt_tokens} completion=${json.usage.completion_tokens} total=${json.usage.total_tokens}`);
-          }
-        } catch { /* skip malformed chunks */ }
-      }
-    }
-
-    const totalMs = Date.now() - t0;
-    console.log(`[KIMI:COMPLETE] label=${label} total_ms=${totalMs} TTFT=${firstChunkMs}ms content_chars=${fullContent.length} content_chunks=${contentChunks} reasoning_chunks=${reasoningChunks}`);
-
-    return fullContent.trim();
+  const messages: KimiMessage[] = [
+    {
+      role: 'system',
+      content: `Ты — аналитик данных. Сформируй финальный отчёт по результатам анализа.
+Отвечай СТРОГО в JSON формате без markdown:
+{
+  "summary": "связный текст 3-5 предложений с выводами и объяснением причин",
+  "recommendations": ["рекомендация 1", "рекомендация 2", "рекомендация 3"],
+  "kpis": {
+    "ключевая метрика": "значение",
+    "ещё метрика": "значение"
   }
+}
 
-  private parseIterationResult(raw: string, iteration: number): IterationResult {
-    try {
-      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(clean);
-      const result = {
-        python: this.extractCode(parsed.python || ''),
-        summary: (parsed.summary || 'No summary').slice(0, 200),
-        enough: Boolean(parsed.enough),
-        reason: (parsed.reason || '').slice(0, 100),
-      };
-      console.log(`[KIMI:PARSE_OK] iter=${iteration} python_chars=${result.python.length} enough=${result.enough}`);
-      return result;
-    } catch (e) {
-      console.error(`[KIMI:PARSE_FAIL] iter=${iteration} error="${String(e)}" raw="${raw.slice(0, 200)}"`);
-      return {
-        python: this.extractCode(raw),
-        summary: 'Iteration completed (parse fallback)',
-        enough: false,
-        reason: 'JSON parse failed',
-      };
-    }
-  }
+Правила:
+- Отвечай конкретно на вопрос пользователя
+- Называй конкретные числа из данных
+- Рекомендации — действия, не наблюдения
+- KPIs — самые важные цифры из анализа (3-5 штук)`,
+    },
+    {
+      role: 'user',
+      content: `Вопрос пользователя: ${userQuestion}
 
-  private extractCode(text: string): string {
-    const fenceMatch = text.match(/```(?:python)?\n?([\s\S]*?)```/);
-    if (fenceMatch) return fenceMatch[1].trim();
-    return text.trim();
+Резюме итераций:
+${allSummaries.map((s, i) => `[${i + 1}] ${s}`).join('\n')}
+
+Сырые данные из анализа:
+${combinedOutputs.slice(0, 3000)}
+
+Сформируй финальный отчёт.`,
+    },
+  ];
+
+  const result = await callKimi(client, messages, 1500);
+
+  try {
+    const clean = result.content.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      summary: parsed.summary ?? 'Анализ завершён.',
+      recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
+      kpis: typeof parsed.kpis === 'object' ? parsed.kpis : {},
+    };
+  } catch (e) {
+    console.error('[kimi] final summary parse error:', e);
+    return {
+      summary: allSummaries.join(' '),
+      recommendations: ['Проверьте данные вручную'],
+      kpis: {},
+    };
   }
 }
