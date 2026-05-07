@@ -115,7 +115,8 @@ export class AnalysisOrchestrator {
 
     try {
       const connector = new CSVConnector();
-      const normalized = connector.parse(csvRaw, fileName);
+      console.log([orchestrator] csvRaw type=+typeof csvRaw+ len=+String(csvRaw).length+ first50=+String(csvRaw).slice(0,50));
+      const normalized = connector.parse(String(csvRaw), fileName);
       const description = normalized.description;
 
       const e2b = new E2BClient('');
