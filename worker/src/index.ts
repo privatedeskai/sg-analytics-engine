@@ -19,6 +19,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+function decodeCSV(raw: string): string {
+  // Always decode as base64 — safe for any content including multiline CSV
+  // Client must send CSV as base64 via btoa() or Buffer.from().toString('base64')
+  try {
+    const binary = atob(raw);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    // Fallback: raw string if not valid base64
+    return raw;
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === 'OPTIONS') {
@@ -30,7 +46,7 @@ export default {
     if (request.method === 'GET' && url.pathname === '/status') {
       return Response.json({
         status: 'ok',
-        version: '0.9.0',
+        version: '0.9.1',
         session: 9,
         timestamp: new Date().toISOString(),
         components: {
@@ -52,7 +68,7 @@ export default {
         return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: corsHeaders });
       }
 
-      const { question, data, csvContent, sessionId: existingSession, userId = 'anon' } = body;
+      const { question, csvContent, sessionId: existingSession, userId = 'anon' } = body;
 
       if (!question) {
         return Response.json({ error: 'Missing required field: question' }, { status: 400, headers: corsHeaders });
@@ -61,7 +77,10 @@ export default {
       const sessionId = existingSession || crypto.randomUUID();
       const maxIterations = parseInt(env.MAX_ITERATIONS || '10');
 
-      await env.KV.put(`session:${sessionId}`, JSON.stringify({
+      // Decode CSV from base64 — Unicode-safe, handles multiline content
+      const csvDecoded = csvContent ? decodeCSV(csvContent) : '';
+
+      await env.KV.put('session:' + sessionId, JSON.stringify({
         sessionId,
         status: 'started',
         iteration: 0,
@@ -80,7 +99,7 @@ export default {
         body: JSON.stringify({
           sessionId,
           question,
-          csvData: csvContent || data || '',
+          csvData: csvDecoded,
           fileName: body.fileName || 'data.csv',
           userId,
           maxIterations,
@@ -88,7 +107,7 @@ export default {
       });
 
       ctx.waitUntil(orchestrator.fetch(orchestratorRequest).catch((err) => {
-        return env.KV.put(`session:${sessionId}`, JSON.stringify({
+        return env.KV.put('session:' + sessionId, JSON.stringify({
           sessionId,
           status: 'error',
           message: 'Orchestrator failed: ' + String(err),
@@ -109,7 +128,7 @@ export default {
         return Response.json({ error: 'Missing sessionId' }, { status: 400, headers: corsHeaders });
       }
 
-      const raw = await env.KV.get(`session:${sessionId}`);
+      const raw = await env.KV.get('session:' + sessionId);
       if (!raw) {
         return Response.json({ error: 'Session not found', sessionId }, { status: 404, headers: corsHeaders });
       }
