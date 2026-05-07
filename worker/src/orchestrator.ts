@@ -1,55 +1,57 @@
-import { E2BClient } from "./e2b";
-import { KimiClient } from "./kimi";
-import { OutputFormatter } from "./output";
+// orchestrator.ts — AnalysisOrchestrator Durable Object
+// Алгоритм Вариант 2: резюме между итерациями + ранний выход по enough=true
+// TODO_TEMP TD-003: таймауты — оценить после 3 успешных тестов
 
-export interface AnalysisRequest {
-  sessionId: string;
-  question: string;
-  csvContent: string;
-  userId: string;
-  maxIterations?: number;
-  language?: "ru" | "en";
-}
-
-export interface SessionStatus {
-  sessionId: string;
-  iteration: number;
-  total: number;
-  message: string;
-  status: "running" | "completed" | "error";
-  result?: AnalysisResult;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
-  question?: string;
-}
-
-export interface AnalysisResult {
-  sessionId: string;
-  summary: string;
-  metrics: any[];
-  charts: any[];
-  iterations: Array<{ n: number; output: string; executionTimeMs: number }>;
-  durationMs: number;
-  error?: string;
-}
-
-interface Env {
-  KV: KVNamespace;
-  E2B_API_KEY: string;
-  DEEPINFRA_API_KEY: string;
-  CLAUDE_API_KEY: string;
-}
+import { runPlanner, runEvaluator, runFinalSummary } from './kimi';
+import { executeCode } from './e2b';
+import { loadCSV } from './connectors/csv';
+import { formatOutput } from './output';
 
 const MAX_ITERATIONS = 10;
+const KIMI_TIMEOUT_MS = 30000; // TODO_TEMP TD-003
+const JUDGE0_TIMEOUT_MS = 15000; // TODO_TEMP TD-003
 
-// Kimi K2.6 on DeepInfra: cold start 15-20s, warm 2-3s
-// 30s covers cold start with margin
-const KIMI_TIMEOUT_MS    = 30000;
-const JUDGE0_TIMEOUT_MS  = 15000;
-const SUMMARY_TIMEOUT_MS = 30000;
+export interface Env {
+  KV: KVNamespace;
+  GONKA_PRIVATE_KEY: string;
+  CLAUDE_API_KEY: string;
+  MAX_ITERATIONS?: string;
+}
 
-export class AnalysisOrchestrator implements DurableObject {
+interface SessionState {
+  status: 'pending' | 'running' | 'completed' | 'error';
+  iteration: number;
+  maxIterations: number;
+  summaries: string[];
+  outputs: string[];
+  progressMessage: string;
+  result?: {
+    summary: string;
+    recommendations: string[];
+    kpis: Record<string, string | number>;
+    chartData?: unknown;
+  };
+  error?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+function progressMessage(iteration: number, max: number): string {
+  const pct = Math.round((iteration / max) * 100);
+  if (iteration <= 2) return `Загружаю данные, проверяю структуру... ${pct}%`;
+  if (iteration <= 4) return `Группирую по периодам, ищу аномалии... ${pct}%`;
+  if (iteration <= 7) return `Проверяю гипотезу по категориям... ${pct}%`;
+  return `Формирую выводы и рекомендацию... ${pct}%`;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`Timeout: ${label} (${ms}ms)`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+export class AnalysisOrchestrator {
   private state: DurableObjectState;
   private env: Env;
 
@@ -60,162 +62,213 @@ export class AnalysisOrchestrator implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/analyze" && request.method === "POST") {
-      const body = await request.json() as AnalysisRequest;
-      console.log(`[ORCHESTRATOR] fetch /analyze — sessionId=${body.sessionId} USING_maxIter=${MAX_ITERATIONS}`);
-      this.state.waitUntil(this.runAnalysis(body));
-      return Response.json({ sessionId: body.sessionId, status: "started" });
+    const path = url.pathname;
+
+    if (request.method === 'POST' && path === '/start') {
+      return this.handleStart(request);
     }
-    return new Response("Not found", { status: 404 });
+
+    return new Response('Not found', { status: 404 });
   }
 
-  private async saveStatus(status: SessionStatus): Promise<void> {
-    try {
-      console.log(`[KV:write] session=${status.sessionId} status=${status.status} iter=${status.iteration}/${status.total} msg="${status.message}"`);
-      await this.env.KV.put(`session:${status.sessionId}`, JSON.stringify(status), { expirationTtl: 86400 });
-    } catch (err) {
-      console.error(`[KV:write:ERROR]`, err);
-    }
-  }
-
-  private getIterationMessage(i: number, total: number): string {
-    const pct = Math.round(i / total * 100);
-    if (i === 1) return `Loading data, detecting schema... (${pct}%)`;
-    if (i === 2) return `Grouping by periods, searching anomalies... (${pct}%)`;
-    if (i <= 4)  return `Testing hypotheses... (${pct}%)`;
-    if (i <= 7)  return `Deepening analysis... (${pct}%)`;
-    return `Forming conclusions... (${pct}%)`;
-  }
-
-  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout: ${label} exceeded ${ms}ms`)), ms)
-      ),
-    ]);
-  }
-
-  private async runAnalysis(req: AnalysisRequest): Promise<void> {
-    const startTime = Date.now();
-    const maxIter = MAX_ITERATIONS;
-    const { sessionId, question, csvContent, language = "ru" } = req;
-
-    console.log(`[ANALYSIS:START] session=${sessionId} maxIter=${maxIter} kimi_timeout=${KIMI_TIMEOUT_MS}ms question="${question.slice(0,60)}"`);
-
-    const e2b       = new E2BClient(this.env.E2B_API_KEY);
-    const kimi      = new KimiClient(this.env.DEEPINFRA_API_KEY);
-    const formatter = new OutputFormatter();
-
-    const result: AnalysisResult = {
-      sessionId, summary: "", metrics: [], charts: [], iterations: [], durationMs: 0,
+  private async handleStart(request: Request): Promise<Response> {
+    const body = await request.json() as {
+      sessionId: string;
+      csvData: string;
+      fileName: string;
+      question: string;
     };
 
+    const { sessionId, csvData, fileName, question } = body;
+    const maxIter = parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
+
+    // Инициализация сессии
+    const initialState: SessionState = {
+      status: 'running',
+      iteration: 0,
+      maxIterations: maxIter,
+      summaries: [],
+      outputs: [],
+      progressMessage: 'Инициализация анализа...',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await this.saveSession(sessionId, initialState);
+
+    // Запускаем анализ асинхронно
+    this.state.waitUntil(this.runAnalysis(sessionId, csvData, fileName, question, maxIter));
+
+    return new Response(JSON.stringify({ ok: true, sessionId }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  private async runAnalysis(
+    sessionId: string,
+    csvData: string,
+    fileName: string,
+    question: string,
+    maxIter: number
+  ): Promise<void> {
+    const gonkaKey = this.env.GONKA_PRIVATE_KEY;
+
     try {
-      await this.saveStatus({ sessionId, iteration: 0, total: maxIter, message: "Initializing...", status: "running", startedAt: new Date().toISOString(), question });
+      // Парсим CSV и строим описание данных
+      const { df, description } = await loadCSV(csvData, fileName);
 
-      const sandboxId = await e2b.createSandbox(180000);
-      console.log(`[E2B] Sandbox created: ${sandboxId}`);
-      await e2b.uploadCSV(sandboxId, csvContent);
-      console.log(`[E2B] CSV uploaded (${csvContent.length} bytes)`);
-
-      const schemaCode = [
-        "import csv, json, io",
-        "reader = csv.DictReader(io.StringIO(CSV_DATA))",
-        "rows = list(reader)",
-        "columns = list(rows[0].keys()) if rows else []",
-        "sample = rows[:3]",
-        "print(json.dumps({'schema': {'columns': columns, 'shape': [len(rows), len(columns)]}, 'sample': sample}))",
-      ].join("\n");
-
-      const schemaRun = await this.withTimeout(e2b.runCode(sandboxId, schemaCode), 15000, "schema detection");
-      let dataDescription = `CSV columns: ${csvContent.split('\n')[0]}`;
-      try {
-        const parsed = JSON.parse(schemaRun.stdout) as any;
-        dataDescription = `Schema: ${JSON.stringify(parsed.schema)}\nSample: ${JSON.stringify(parsed.sample)}`;
-        console.log(`[SCHEMA] OK — columns=${JSON.stringify(parsed.schema?.columns)} rows=${parsed.schema?.shape?.[0]}`);
-      } catch {
-        console.log(`[SCHEMA] Parse failed — using CSV header fallback`);
-      }
-
-      const iterationSummaries: string[] = [];
-      let converged = false;
+      const summaries: string[] = [];
+      const outputs: string[] = [];
 
       for (let i = 1; i <= maxIter; i++) {
-        const iterStart = Date.now();
-        console.log(`[ITER:${i}/${maxIter}] ===== START ===== elapsed=${Date.now()-startTime}ms`);
+        console.log(`[orchestrator] iteration ${i}/${maxIter}`);
 
-        await this.saveStatus({ sessionId, iteration: i, total: maxIter, message: this.getIterationMessage(i, maxIter), status: "running", question });
+        await this.updateSession(sessionId, {
+          iteration: i,
+          progressMessage: progressMessage(i, maxIter),
+          summaries,
+          outputs,
+        });
 
-        let iterResult: any;
+        // 1. Planner: гипотеза + Python код
+        let plannerResult;
         try {
-          console.log(`[ITER:${i}] Calling Kimi K2.6 (timeout=${KIMI_TIMEOUT_MS}ms)...`);
-          iterResult = await this.withTimeout(
-            kimi.generateIteration(dataDescription, question, iterationSummaries, i, maxIter),
-            KIMI_TIMEOUT_MS, `kimi iteration ${i}`
+          plannerResult = await withTimeout(
+            runPlanner(gonkaKey, description, question, summaries, i),
+            KIMI_TIMEOUT_MS,
+            'planner'
           );
-          console.log(`[ITER:${i}] Kimi OK — python=${iterResult.python.length}chars enough=${iterResult.enough} elapsed=${Date.now()-iterStart}ms`);
-        } catch (err) {
-          console.error(`[ITER:${i}] Kimi TIMEOUT/ERROR: ${String(err)}`);
-          iterationSummaries.push(`Iteration ${i} skipped: ${String(err)}`);
+        } catch (e) {
+          console.error(`[orchestrator] planner timeout/error iter ${i}:`, e);
+          summaries.push(`Итерация ${i}: ошибка планировщика`);
           continue;
         }
 
-        let execResult: any;
+        console.log(`[orchestrator] hypothesis: ${plannerResult.hypothesis}`);
+
+        // 2. Execute Python через Judge0
+        let execOutput = '';
         try {
-          console.log(`[ITER:${i}] Running code in Judge0...`);
-          execResult = await this.withTimeout(e2b.runCode(sandboxId, iterResult.python), JUDGE0_TIMEOUT_MS, `judge0 iteration ${i}`);
-          console.log(`[ITER:${i}] Judge0 done — stdout=${execResult.stdout.slice(0,100)} error=${execResult.error} execTime=${execResult.executionTime}ms total_elapsed=${Date.now()-iterStart}ms`);
-        } catch (err) {
-          execResult = { stdout: "", stderr: String(err), error: String(err), executionTime: 0 };
-          console.error(`[ITER:${i}] Judge0 TIMEOUT/ERROR: ${String(err)}`);
+          execOutput = await withTimeout(
+            executeCode(plannerResult.python_code, df),
+            JUDGE0_TIMEOUT_MS,
+            'judge0'
+          );
+        } catch (e) {
+          console.error(`[orchestrator] exec timeout/error iter ${i}:`, e);
+          execOutput = `Ошибка выполнения: ${String(e).slice(0, 200)}`;
         }
 
-        const output = execResult.error
-          ? `ERROR: ${execResult.error}\nSTDERR: ${execResult.stderr}`
-          : execResult.stdout || execResult.stderr || "(no output)";
+        outputs.push(execOutput);
 
-        iterationSummaries.push(iterResult.summary);
-        result.iterations.push({ n: i, output, executionTimeMs: execResult.executionTime || 0 });
+        // 3. Evaluator: резюме + сигнал enough
+        let evalResult;
+        try {
+          evalResult = await withTimeout(
+            runEvaluator(gonkaKey, question, execOutput, summaries, i, maxIter),
+            KIMI_TIMEOUT_MS,
+            'evaluator'
+          );
+        } catch (e) {
+          console.error(`[orchestrator] evaluator timeout/error iter ${i}:`, e);
+          summaries.push(`Итерация ${i}: данные получены`);
+          continue;
+        }
 
-        const parsed = formatter.parseExecutionResult(output);
-        if (parsed.metrics.length > 0) result.metrics = parsed.metrics;
-        if (parsed.charts.length > 0)  result.charts  = parsed.charts;
+        summaries.push(evalResult.summary);
+        console.log(`[orchestrator] enough=${evalResult.enough} summary="${evalResult.summary}"`);
 
-        console.log(`[ITER:${i}/${maxIter}] ===== END ===== iter_elapsed=${Date.now()-iterStart}ms total_elapsed=${Date.now()-startTime}ms`);
-
-        if (iterResult.enough) {
-          converged = true;
-          console.log(`[CONVERGENCE] Kimi signaled enough at iteration ${i}/${maxIter}: "${iterResult.reason}"`);
+        // Ранний выход
+        if (evalResult.enough) {
+          console.log(`[orchestrator] early exit at iteration ${i}`);
           break;
         }
       }
 
-      console.log(`[SUMMARY] Generating final summary (converged=${converged}, iterations=${result.iterations.length})... elapsed=${Date.now()-startTime}ms`);
-      await this.saveStatus({ sessionId, iteration: maxIter, total: maxIter, message: "Generating final summary...", status: "running", question });
+      // 4. Финальный summary
+      await this.updateSession(sessionId, {
+        progressMessage: 'Формирую финальный отчёт...',
+        summaries,
+        outputs,
+      });
 
+      let finalResult;
       try {
-        result.summary = await this.withTimeout(
-          kimi.generateFinalAnalysis(question, iterationSummaries, language),
-          SUMMARY_TIMEOUT_MS, "final summary"
+        finalResult = await withTimeout(
+          runFinalSummary(gonkaKey, question, summaries, outputs),
+          KIMI_TIMEOUT_MS,
+          'final-summary'
         );
-        console.log(`[SUMMARY] OK — ${result.summary.length} chars`);
-      } catch (err) {
-        console.error(`[SUMMARY] TIMEOUT/ERROR: ${String(err)}`);
-        result.summary = iterationSummaries.filter(s => !s.startsWith("Iteration")).join("\n\n") || "Analysis completed.";
+      } catch (e) {
+        console.error('[orchestrator] final summary error:', e);
+        finalResult = {
+          summary: summaries.join(' '),
+          recommendations: ['Проверьте данные вручную'],
+          kpis: {},
+        };
       }
 
-      result.durationMs = Date.now() - startTime;
-      console.log(`[ANALYSIS:COMPLETE] session=${sessionId} durationMs=${result.durationMs} iterations=${result.iterations.length} converged=${converged}`);
+      // 5. Форматируем вывод (Chart.js данные)
+      const chartData = formatOutput(outputs, finalResult.kpis);
 
-      await this.saveStatus({ sessionId, iteration: maxIter, total: maxIter, message: "Analysis complete", status: "completed", result, completedAt: new Date().toISOString(), question });
+      // 6. Сохраняем финальный результат
+      const finalState = await this.loadSession(sessionId);
+      await this.saveSession(sessionId, {
+        ...finalState!,
+        status: 'completed',
+        iteration: summaries.length,
+        summaries,
+        outputs,
+        progressMessage: 'Анализ завершён',
+        result: {
+          summary: finalResult.summary,
+          recommendations: finalResult.recommendations,
+          kpis: finalResult.kpis,
+          chartData,
+        },
+        updatedAt: Date.now(),
+      });
 
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[ANALYSIS:FATAL] session=${sessionId} error="${errMsg}" elapsed=${Date.now()-startTime}ms`);
-      result.error = errMsg;
-      result.durationMs = Date.now() - startTime;
-      await this.saveStatus({ sessionId, iteration: 0, total: maxIter, message: `Error: ${errMsg}`, status: "error", error: errMsg, result, question });
+      console.log(`[orchestrator] session ${sessionId} completed`);
+    } catch (e) {
+      console.error('[orchestrator] fatal error:', e);
+      const state = await this.loadSession(sessionId);
+      await this.saveSession(sessionId, {
+        ...state!,
+        status: 'error',
+        error: String(e).slice(0, 500),
+        progressMessage: 'Ошибка анализа',
+        updatedAt: Date.now(),
+      });
     }
+  }
+
+  private async loadSession(sessionId: string): Promise<SessionState | null> {
+    const raw = await this.env.KV.get(`session:${sessionId}`);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as SessionState;
+    } catch {
+      return null;
+    }
+  }
+
+  private async saveSession(sessionId: string, state: SessionState): Promise<void> {
+    await this.env.KV.put(`session:${sessionId}`, JSON.stringify(state), {
+      expirationTtl: 60 * 60 * 24, // 24 часа
+    });
+  }
+
+  private async updateSession(
+    sessionId: string,
+    patch: Partial<SessionState>
+  ): Promise<void> {
+    const state = await this.loadSession(sessionId);
+    if (!state) return;
+    await this.saveSession(sessionId, {
+      ...state,
+      ...patch,
+      updatedAt: Date.now(),
+    });
   }
 }
