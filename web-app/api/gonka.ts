@@ -1,6 +1,6 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils.js';
 
 const NODES = [
   'http://node1.gonka.ai:8000',
@@ -58,10 +58,10 @@ export default async function handler(req: any, res: any) {
 
     const ts = (Date.now() * 1000000).toString();
     const payload = new TextEncoder().encode(body + ts + ep.address);
-    const sig = secp256k1.sign(sha256(payload), toBytes(pk));
-    const sigB64 = btoa(
-      String.fromCharCode(...hexToBytes(bytesToHex(sig.toCompactRawBytes())))
-    );
+    const hash = sha256(payload);
+    const sig = secp256k1.sign(hash, toBytes(pk));
+    const sigBytes = sig.toCompactBytes();
+    const sigB64 = btoa(String.fromCharCode(...sigBytes));
 
     const r = await fetch(ep.url, {
       method: 'POST',
