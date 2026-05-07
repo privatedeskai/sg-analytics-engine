@@ -44,12 +44,11 @@ export async function createGonkaSignature(
   const msgHashBuffer = await crypto.subtle.digest('SHA-256', message);
   const msgHashBytes = new Uint8Array(msgHashBuffer);
 
-  // lowS: true — нормализация low-S встроена в v2.x
-  const signature = secp256k1.sign(msgHashBytes, privateKeyBytes, { lowS: true });
+  // v2: sign() returns Uint8Array compact format (64 bytes: r32 + s32)
+  // prehash: false — передаём уже готовый SHA-256 хеш
+  // lowS: true — по умолчанию, нормализация встроена
+  const sigBytes = secp256k1.sign(msgHashBytes, privateKeyBytes, { prehash: false });
 
-  const r = signature.r.toString(16).padStart(64, '0');
-  const s = signature.s.toString(16).padStart(64, '0');
-  const combined = concatBytes(hexToBytes(r), hexToBytes(s));
-
-  return bytesToBase64(combined);
+  // sigBytes уже Uint8Array 64 байта в compact формате
+  return bytesToBase64(sigBytes);
 }
