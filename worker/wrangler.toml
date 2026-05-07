@@ -1,11 +1,11 @@
 name = "sg-analytics-engine"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 upload_source_maps = false
 
 [vars]
-# TD-001 CLOSED: switched to Kimi K2.6 via DeepInfra
+# TD-001 CLOSED: switched to Kimi K2.6 via gonka-openai SDK
 # TD-002 CLOSED: 10 iterations — Kimi K2.6 is fast enough (~2-3s per iteration)
 MAX_ITERATIONS = "10"
 
