@@ -22,7 +22,7 @@ const GONKA_NODES = [
   'http://node3.gonka.ai:8000',
 ];
 
-const MODEL = 'moonshotai/Kimi-K2-Instruct';
+const MODEL = 'moonshotai/Kimi-K2.6';
 
 async function getActiveNode(): Promise<{ url: string; providerAddress: string }> {
   for (const node of GONKA_NODES) {
@@ -31,7 +31,7 @@ async function getActiveNode(): Promise<{ url: string; providerAddress: string }
         signal: AbortSignal.timeout(5000),
       });
       if (!resp.ok) continue;
-      const participants = await resp.json() as Array<{
+      const raw = await resp.json() as { active_participants?: { participants?: Array<unknown> } }; const participants = (raw.active_participants?.participants ?? []) as Array<{
         inference_url?: string;
         index?: string;
       }>;
