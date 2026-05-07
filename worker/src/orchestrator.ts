@@ -36,15 +36,15 @@ interface SessionState {
 
 function getProgressMessage(iteration: number, max: number): string {
   const pct = Math.round((iteration / max) * 100);
-  if (iteration <= 2) return `Loading data, checking structure... ${pct}%`;
-  if (iteration <= 4) return `Grouping by periods, searching anomalies... ${pct}%`;
-  if (iteration <= 7) return `Testing hypotheses... ${pct}%`;
-  return `Forming conclusions... ${pct}%`;
+  if (iteration <= 2) return 'Loading data, checking structure... ' + pct + '%';
+  if (iteration <= 4) return 'Grouping by periods, searching anomalies... ' + pct + '%';
+  if (iteration <= 7) return 'Testing hypotheses... ' + pct + '%';
+  return 'Forming conclusions... ' + pct + '%';
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout: ${label} (${ms}ms)`)), ms)
+    setTimeout(() => reject(new Error('Timeout: ' + label + ' (' + ms + 'ms)')), ms)
   );
   return Promise.race([promise, timeout]);
 }
@@ -70,18 +70,20 @@ export class AnalysisOrchestrator {
   private async handleStart(request: Request): Promise<Response> {
     const body = await request.json() as {
       sessionId: string;
-      csvData?: string;
-      csvContent?: string;
-      fileName: string;
-      question: string;
+      csvData?: unknown;
+      csvContent?: unknown;
+      fileName?: string;
+      question?: string;
       maxIterations?: number;
     };
 
-    const sessionId = body.sessionId;
-    const csvRaw = body.csvData || body.csvContent || '';
-    const fileName = body.fileName || 'data.csv';
-    const question = body.question || '';
-    const maxIter = body.maxIterations || parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
+    const sessionId = String(body.sessionId || '');
+    const csvRaw = String(body.csvData || body.csvContent || '');
+    const fileName = String(body.fileName || 'data.csv');
+    const question = String(body.question || '');
+    const maxIter = Number(body.maxIterations) || parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
+
+    console.log('[orchestrator] handleStart sessionId=' + sessionId + ' csvLen=' + csvRaw.length + ' question=' + question.slice(0, 50));
 
     const initialState: SessionState = {
       status: 'running',
@@ -114,9 +116,10 @@ export class AnalysisOrchestrator {
     const formatter = new OutputFormatter();
 
     try {
+      console.log('[orchestrator] csvRaw type=' + typeof csvRaw + ' len=' + csvRaw.length + ' first50=' + csvRaw.slice(0, 50));
+
       const connector = new CSVConnector();
-      console.log([orchestrator] csvRaw type=+typeof csvRaw+ len=+String(csvRaw).length+ first50=+String(csvRaw).slice(0,50));
-      const normalized = connector.parse(String(csvRaw), fileName);
+      const normalized = connector.parse(csvRaw, fileName);
       const description = normalized.description;
 
       const e2b = new E2BClient('');
@@ -127,7 +130,7 @@ export class AnalysisOrchestrator {
       const outputs: string[] = [];
 
       for (let i = 1; i <= maxIter; i++) {
-        console.log(`[orchestrator] iteration ${i}/${maxIter}`);
+        console.log('[orchestrator] iteration ' + i + '/' + maxIter);
 
         await this.updateSession(sessionId, {
           iteration: i,
@@ -144,12 +147,12 @@ export class AnalysisOrchestrator {
             'planner'
           );
         } catch (e) {
-          console.error(`[orchestrator] planner timeout/error iter ${i}:`, e);
-          summaries.push(`Iteration ${i}: planner error`);
+          console.error('[orchestrator] planner error iter ' + i + ': ' + String(e));
+          summaries.push('Iteration ' + i + ': planner error');
           continue;
         }
 
-        console.log(`[orchestrator] hypothesis: ${plannerResult.hypothesis}`);
+        console.log('[orchestrator] hypothesis: ' + plannerResult.hypothesis);
 
         let execOutput = '';
         try {
@@ -160,11 +163,11 @@ export class AnalysisOrchestrator {
           );
           execOutput = execResult.stdout || execResult.stderr || '';
           if (execResult.error) {
-            console.error(`[orchestrator] exec error iter ${i}:`, execResult.error);
+            console.error('[orchestrator] exec error iter ' + i + ': ' + execResult.error);
           }
         } catch (e) {
-          console.error(`[orchestrator] exec timeout iter ${i}:`, e);
-          execOutput = `Execution error: ${String(e).slice(0, 200)}`;
+          console.error('[orchestrator] exec timeout iter ' + i + ': ' + String(e));
+          execOutput = 'Execution error: ' + String(e).slice(0, 200);
         }
 
         outputs.push(execOutput);
@@ -177,16 +180,16 @@ export class AnalysisOrchestrator {
             'evaluator'
           );
         } catch (e) {
-          console.error(`[orchestrator] evaluator timeout/error iter ${i}:`, e);
-          summaries.push(`Iteration ${i}: data received`);
+          console.error('[orchestrator] evaluator error iter ' + i + ': ' + String(e));
+          summaries.push('Iteration ' + i + ': data received');
           continue;
         }
 
         summaries.push(evalResult.summary);
-        console.log(`[orchestrator] enough=${evalResult.enough} summary="${evalResult.summary}"`);
+        console.log('[orchestrator] enough=' + evalResult.enough + ' summary=' + evalResult.summary);
 
         if (evalResult.enough) {
-          console.log(`[orchestrator] early exit at iteration ${i}`);
+          console.log('[orchestrator] early exit at iteration ' + i);
           break;
         }
       }
@@ -205,7 +208,7 @@ export class AnalysisOrchestrator {
           'final-summary'
         );
       } catch (e) {
-        console.error('[orchestrator] final summary error:', e);
+        console.error('[orchestrator] final summary error: ' + String(e));
         finalResult = {
           summary: summaries.join(' '),
           recommendations: ['Check data manually'],
@@ -234,9 +237,9 @@ export class AnalysisOrchestrator {
         updatedAt: Date.now(),
       });
 
-      console.log(`[orchestrator] session ${sessionId} completed`);
+      console.log('[orchestrator] session ' + sessionId + ' completed');
     } catch (e) {
-      console.error('[orchestrator] fatal error:', e);
+      console.error('[orchestrator] fatal error: ' + String(e));
       const state = await this.loadSession(sessionId);
       await this.saveSession(sessionId, {
         ...state!,
@@ -249,7 +252,7 @@ export class AnalysisOrchestrator {
   }
 
   private async loadSession(sessionId: string): Promise<SessionState | null> {
-    const raw = await this.env.KV.get(`session:${sessionId}`);
+    const raw = await this.env.KV.get('session:' + sessionId);
     if (!raw) return null;
     try {
       return JSON.parse(raw) as SessionState;
@@ -259,7 +262,7 @@ export class AnalysisOrchestrator {
   }
 
   private async saveSession(sessionId: string, state: SessionState): Promise<void> {
-    await this.env.KV.put(`session:${sessionId}`, JSON.stringify(state), {
+    await this.env.KV.put('session:' + sessionId, JSON.stringify(state), {
       expirationTtl: 60 * 60 * 24,
     });
   }
