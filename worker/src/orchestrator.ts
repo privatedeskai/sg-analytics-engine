@@ -3,9 +3,9 @@
 // TODO_TEMP TD-003: таймауты — оценить после 3 успешных тестов
 
 import { runPlanner, runEvaluator, runFinalSummary } from './kimi';
-import { executeCode } from './e2b';
-import { loadCSV } from './connectors/csv';
-import { formatOutput } from './output';
+import { E2BClient } from './e2b';
+import { CSVConnector } from './connectors/csv';
+import { OutputFormatter, AnalysisOutput } from './output';
 
 const MAX_ITERATIONS = 10;
 const KIMI_TIMEOUT_MS = 30000; // TODO_TEMP TD-003
@@ -29,7 +29,8 @@ interface SessionState {
     summary: string;
     recommendations: string[];
     kpis: Record<string, string | number>;
-    chartData?: unknown;
+    metrics: any[];
+    charts: any[];
   };
   error?: string;
   createdAt: number;
@@ -82,7 +83,6 @@ export class AnalysisOrchestrator {
     const { sessionId, csvData, fileName, question } = body;
     const maxIter = parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
 
-    // Инициализация сессии
     const initialState: SessionState = {
       status: 'running',
       iteration: 0,
@@ -96,7 +96,6 @@ export class AnalysisOrchestrator {
 
     await this.saveSession(sessionId, initialState);
 
-    // Запускаем анализ асинхронно
     this.state.waitUntil(this.runAnalysis(sessionId, csvData, fileName, question, maxIter));
 
     return new Response(JSON.stringify({ ok: true, sessionId }), {
@@ -112,10 +111,18 @@ export class AnalysisOrchestrator {
     maxIter: number
   ): Promise<void> {
     const gonkaKey = this.env.GONKA_PRIVATE_KEY;
+    const formatter = new OutputFormatter();
 
     try {
-      // Парсим CSV и строим описание данных
-      const { df, description } = await loadCSV(csvData, fileName);
+      // Парсим CSV
+      const connector = new CSVConnector();
+      const normalized = connector.parse(csvData, fileName);
+      const description = normalized.description;
+
+      // Инициализируем E2B клиент (Judge0 CE)
+      const e2b = new E2BClient('');
+      const sandboxId = await e2b.createSandbox();
+      await e2b.uploadCSV(sandboxId, normalized.csvString);
 
       const summaries: string[] = [];
       const outputs: string[] = [];
@@ -149,13 +156,17 @@ export class AnalysisOrchestrator {
         // 2. Execute Python через Judge0
         let execOutput = '';
         try {
-          execOutput = await withTimeout(
-            executeCode(plannerResult.python_code, df),
+          const execResult = await withTimeout(
+            e2b.runCode(sandboxId, plannerResult.python_code),
             JUDGE0_TIMEOUT_MS,
             'judge0'
           );
+          execOutput = execResult.stdout || execResult.stderr || '';
+          if (execResult.error) {
+            console.error(`[orchestrator] exec error iter ${i}:`, execResult.error);
+          }
         } catch (e) {
-          console.error(`[orchestrator] exec timeout/error iter ${i}:`, e);
+          console.error(`[orchestrator] exec timeout iter ${i}:`, e);
           execOutput = `Ошибка выполнения: ${String(e).slice(0, 200)}`;
         }
 
@@ -178,7 +189,6 @@ export class AnalysisOrchestrator {
         summaries.push(evalResult.summary);
         console.log(`[orchestrator] enough=${evalResult.enough} summary="${evalResult.summary}"`);
 
-        // Ранний выход
         if (evalResult.enough) {
           console.log(`[orchestrator] early exit at iteration ${i}`);
           break;
@@ -208,8 +218,9 @@ export class AnalysisOrchestrator {
         };
       }
 
-      // 5. Форматируем вывод (Chart.js данные)
-      const chartData = formatOutput(outputs, finalResult.kpis);
+      // 5. Парсим метрики и графики из outputs
+      const allOutputText = outputs.join('\n');
+      const { metrics, charts } = formatter.parseExecutionResult(allOutputText);
 
       // 6. Сохраняем финальный результат
       const finalState = await this.loadSession(sessionId);
@@ -224,7 +235,8 @@ export class AnalysisOrchestrator {
           summary: finalResult.summary,
           recommendations: finalResult.recommendations,
           kpis: finalResult.kpis,
-          chartData,
+          metrics,
+          charts,
         },
         updatedAt: Date.now(),
       });
@@ -255,7 +267,7 @@ export class AnalysisOrchestrator {
 
   private async saveSession(sessionId: string, state: SessionState): Promise<void> {
     await this.env.KV.put(`session:${sessionId}`, JSON.stringify(state), {
-      expirationTtl: 60 * 60 * 24, // 24 часа
+      expirationTtl: 60 * 60 * 24,
     });
   }
 
