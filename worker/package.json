@@ -8,9 +8,9 @@
     "tail": "wrangler tail --format pretty"
   },
   "devDependencies": {
-    "wrangler": "3.99.0"
+    "wrangler": "^4.88.0"
   },
   "dependencies": {
-    "gonka-openai": "^0.2.6"
+    "@noble/curves": "^2.2.0"
   }
 }
