@@ -159,3 +159,25 @@ Unicode-safe base64, исправлен kimi.ts, UI poll timeout 10 минут, 
 Диагностика: найдена корневая причина — thinking mode съедает все токены на DeepInfra.
 DeepInfra игнорирует thinking:disabled. Решение: gonka-openai SDK (TD-001).
 Утверждена концепция Gonka Lens. Все документы обновлены.
+
+## Что сделано в сессии 9
+
+### Главный результат
+- Новый GONKA_PRIVATE_KEY сгенерирован (address: gonka153la5nagprxzt3hf2nqve68yxdqr2zay2ue5yj)
+- GONKA_PRIVATE_KEY добавлен в Cloudflare secrets и Vercel Environment Variables
+- Реализована Vercel proxy архитектура: CF Worker → Vercel /api/gonka → Gonka ноды
+- gonka-openai SDK удалён из Worker (несовместим с CF Workers из-за @cosmjs/crypto)
+- kimi.ts переписан: Worker вызывает Vercel прокси через fetch
+- web-app/api/gonka.ts создан: ECDSA подпись через @noble/curves + прокси к Gonka
+- Worker деплоится успешно (39 KiB вместо 3493 KiB)
+- Vercel функция отвечает корректно
+
+### Текущая ошибка
+- Proxy 500: Error: No endpoints
+- Vercel не может распарсить список участников от Gonka нод
+- Причина: структура JSON ответа Gonka API отличается от ожидаемой
+
+### Первые шаги сессии 10
+1. Проверить реальную структуру ответа Gonka API
+2. Исправить парсинг в web-app/api/gonka.ts
+3. Задеплоить и протестировать полный pipeline
