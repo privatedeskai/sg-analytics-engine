@@ -1,19 +1,16 @@
-// orchestrator.ts — AnalysisOrchestrator Durable Object
-// Алгоритм Вариант 2: резюме между итерациями + ранний выход по enough=true
-// TODO_TEMP TD-003: таймауты — оценить после 3 успешных тестов
-
-import { runPlanner, runEvaluator, runFinalSummary } from './kimi';
+﻿import { runPlanner, runEvaluator, runFinalSummary } from './kimi';
 import { E2BClient } from './e2b';
 import { CSVConnector } from './connectors/csv';
-import { OutputFormatter, AnalysisOutput } from './output';
+import { OutputFormatter } from './output';
 
 const MAX_ITERATIONS = 10;
-const KIMI_TIMEOUT_MS = 30000; // TODO_TEMP TD-003
-const JUDGE0_TIMEOUT_MS = 15000; // TODO_TEMP TD-003
+const KIMI_TIMEOUT_MS = 30000;
+const JUDGE0_TIMEOUT_MS = 15000;
 
 export interface Env {
   KV: KVNamespace;
   GONKA_PRIVATE_KEY: string;
+  GONKA_ADDRESS: string;
   CLAUDE_API_KEY: string;
   MAX_ITERATIONS?: string;
 }
@@ -29,20 +26,20 @@ interface SessionState {
     summary: string;
     recommendations: string[];
     kpis: Record<string, string | number>;
-    metrics: any[];
-    charts: any[];
+    metrics: unknown[];
+    charts: unknown[];
   };
   error?: string;
   createdAt: number;
   updatedAt: number;
 }
 
-function progressMessage(iteration: number, max: number): string {
+function getProgressMessage(iteration: number, max: number): string {
   const pct = Math.round((iteration / max) * 100);
-  if (iteration <= 2) return `Загружаю данные, проверяю структуру... ${pct}%`;
-  if (iteration <= 4) return `Группирую по периодам, ищу аномалии... ${pct}%`;
-  if (iteration <= 7) return `Проверяю гипотезу по категориям... ${pct}%`;
-  return `Формирую выводы и рекомендацию... ${pct}%`;
+  if (iteration <= 2) return `Loading data, checking structure... ${pct}%`;
+  if (iteration <= 4) return `Grouping by periods, searching anomalies... ${pct}%`;
+  if (iteration <= 7) return `Testing hypotheses... ${pct}%`;
+  return `Forming conclusions... ${pct}%`;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -64,24 +61,27 @@ export class AnalysisOrchestrator {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
-
     if (request.method === 'POST' && path === '/start') {
       return this.handleStart(request);
     }
-
     return new Response('Not found', { status: 404 });
   }
 
   private async handleStart(request: Request): Promise<Response> {
     const body = await request.json() as {
       sessionId: string;
-      csvData: string;
+      csvData?: string;
+      csvContent?: string;
       fileName: string;
       question: string;
+      maxIterations?: number;
     };
 
-    const { sessionId, csvData, fileName, question } = body;
-    const maxIter = parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
+    const sessionId = body.sessionId;
+    const csvRaw = body.csvData || body.csvContent || '';
+    const fileName = body.fileName || 'data.csv';
+    const question = body.question || '';
+    const maxIter = body.maxIterations || parseInt(this.env.MAX_ITERATIONS ?? String(MAX_ITERATIONS), 10);
 
     const initialState: SessionState = {
       status: 'running',
@@ -89,14 +89,13 @@ export class AnalysisOrchestrator {
       maxIterations: maxIter,
       summaries: [],
       outputs: [],
-      progressMessage: 'Инициализация анализа...',
+      progressMessage: 'Initializing analysis...',
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
 
     await this.saveSession(sessionId, initialState);
-
-    this.state.waitUntil(this.runAnalysis(sessionId, csvData, fileName, question, maxIter));
+    this.state.waitUntil(this.runAnalysis(sessionId, csvRaw, fileName, question, maxIter));
 
     return new Response(JSON.stringify({ ok: true, sessionId }), {
       headers: { 'Content-Type': 'application/json' },
@@ -105,21 +104,20 @@ export class AnalysisOrchestrator {
 
   private async runAnalysis(
     sessionId: string,
-    csvData: string,
+    csvRaw: string,
     fileName: string,
     question: string,
     maxIter: number
   ): Promise<void> {
     const gonkaKey = this.env.GONKA_PRIVATE_KEY;
+    const gonkaAddress = this.env.GONKA_ADDRESS;
     const formatter = new OutputFormatter();
 
     try {
-      // Парсим CSV
       const connector = new CSVConnector();
-      const normalized = connector.parse(csvData, fileName);
+      const normalized = connector.parse(csvRaw, fileName);
       const description = normalized.description;
 
-      // Инициализируем E2B клиент (Judge0 CE)
       const e2b = new E2BClient('');
       const sandboxId = await e2b.createSandbox();
       await e2b.uploadCSV(sandboxId, normalized.csvString);
@@ -132,28 +130,26 @@ export class AnalysisOrchestrator {
 
         await this.updateSession(sessionId, {
           iteration: i,
-          progressMessage: progressMessage(i, maxIter),
+          progressMessage: getProgressMessage(i, maxIter),
           summaries,
           outputs,
         });
 
-        // 1. Planner: гипотеза + Python код
         let plannerResult;
         try {
           plannerResult = await withTimeout(
-            runPlanner(gonkaKey, description, question, summaries, i),
+            runPlanner(gonkaKey, gonkaAddress, description, question, summaries, i),
             KIMI_TIMEOUT_MS,
             'planner'
           );
         } catch (e) {
           console.error(`[orchestrator] planner timeout/error iter ${i}:`, e);
-          summaries.push(`Итерация ${i}: ошибка планировщика`);
+          summaries.push(`Iteration ${i}: planner error`);
           continue;
         }
 
         console.log(`[orchestrator] hypothesis: ${plannerResult.hypothesis}`);
 
-        // 2. Execute Python через Judge0
         let execOutput = '';
         try {
           const execResult = await withTimeout(
@@ -167,22 +163,21 @@ export class AnalysisOrchestrator {
           }
         } catch (e) {
           console.error(`[orchestrator] exec timeout iter ${i}:`, e);
-          execOutput = `Ошибка выполнения: ${String(e).slice(0, 200)}`;
+          execOutput = `Execution error: ${String(e).slice(0, 200)}`;
         }
 
         outputs.push(execOutput);
 
-        // 3. Evaluator: резюме + сигнал enough
         let evalResult;
         try {
           evalResult = await withTimeout(
-            runEvaluator(gonkaKey, question, execOutput, summaries, i, maxIter),
+            runEvaluator(gonkaKey, gonkaAddress, question, execOutput, summaries, i, maxIter),
             KIMI_TIMEOUT_MS,
             'evaluator'
           );
         } catch (e) {
           console.error(`[orchestrator] evaluator timeout/error iter ${i}:`, e);
-          summaries.push(`Итерация ${i}: данные получены`);
+          summaries.push(`Iteration ${i}: data received`);
           continue;
         }
 
@@ -195,9 +190,8 @@ export class AnalysisOrchestrator {
         }
       }
 
-      // 4. Финальный summary
       await this.updateSession(sessionId, {
-        progressMessage: 'Формирую финальный отчёт...',
+        progressMessage: 'Forming final report...',
         summaries,
         outputs,
       });
@@ -205,7 +199,7 @@ export class AnalysisOrchestrator {
       let finalResult;
       try {
         finalResult = await withTimeout(
-          runFinalSummary(gonkaKey, question, summaries, outputs),
+          runFinalSummary(gonkaKey, gonkaAddress, question, summaries, outputs),
           KIMI_TIMEOUT_MS,
           'final-summary'
         );
@@ -213,16 +207,14 @@ export class AnalysisOrchestrator {
         console.error('[orchestrator] final summary error:', e);
         finalResult = {
           summary: summaries.join(' '),
-          recommendations: ['Проверьте данные вручную'],
+          recommendations: ['Check data manually'],
           kpis: {},
         };
       }
 
-      // 5. Парсим метрики и графики из outputs
       const allOutputText = outputs.join('\n');
       const { metrics, charts } = formatter.parseExecutionResult(allOutputText);
 
-      // 6. Сохраняем финальный результат
       const finalState = await this.loadSession(sessionId);
       await this.saveSession(sessionId, {
         ...finalState!,
@@ -230,7 +222,7 @@ export class AnalysisOrchestrator {
         iteration: summaries.length,
         summaries,
         outputs,
-        progressMessage: 'Анализ завершён',
+        progressMessage: 'Analysis completed',
         result: {
           summary: finalResult.summary,
           recommendations: finalResult.recommendations,
@@ -249,7 +241,7 @@ export class AnalysisOrchestrator {
         ...state!,
         status: 'error',
         error: String(e).slice(0, 500),
-        progressMessage: 'Ошибка анализа',
+        progressMessage: 'Analysis error',
         updatedAt: Date.now(),
       });
     }
@@ -271,10 +263,7 @@ export class AnalysisOrchestrator {
     });
   }
 
-  private async updateSession(
-    sessionId: string,
-    patch: Partial<SessionState>
-  ): Promise<void> {
+  private async updateSession(sessionId: string, patch: Partial<SessionState>): Promise<void> {
     const state = await this.loadSession(sessionId);
     if (!state) return;
     await this.saveSession(sessionId, {
