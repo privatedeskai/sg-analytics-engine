@@ -35,16 +35,21 @@ export async function createGonkaSignature(
   providerAddress: string
 ): Promise<string> {
   const privateKeyBytes = hexToBytes(privateKeyHex);
+
   const payloadBytes = new TextEncoder().encode(JSON.stringify(requestBody));
   const timestampBytes = new TextEncoder().encode(timestampNs.toString());
   const providerBytes = new TextEncoder().encode(providerAddress);
   const message = concatBytes(payloadBytes, timestampBytes, providerBytes);
+
   const msgHashBuffer = await crypto.subtle.digest('SHA-256', message);
   const msgHashBytes = new Uint8Array(msgHashBuffer);
-  const signature = secp256k1.sign(msgHashBytes, privateKeyBytes);
-  const normalizedSig = signature.normalizeS();
-  const r = normalizedSig.r.toString(16).padStart(64, '0');
-  const s = normalizedSig.s.toString(16).padStart(64, '0');
+
+  // lowS: true — нормализация low-S встроена в v2.x
+  const signature = secp256k1.sign(msgHashBytes, privateKeyBytes, { lowS: true });
+
+  const r = signature.r.toString(16).padStart(64, '0');
+  const s = signature.s.toString(16).padStart(64, '0');
   const combined = concatBytes(hexToBytes(r), hexToBytes(s));
+
   return bytesToBase64(combined);
 }
