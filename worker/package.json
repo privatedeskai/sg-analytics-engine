@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "wrangler": "3.99.0"
+  },
+  "dependencies": {
+    "gonka-openai": "^0.2.6"
   }
 }
