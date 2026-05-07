@@ -1,8 +1,8 @@
 const fs = require('fs');
 const lines = [
-"import { secp256k1 } from '@noble/curves/secp256k1';",
-"import { sha256 } from '@noble/hashes/sha256';",
-"import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils';",
+"import { secp256k1 } from '@noble/curves/secp256k1.js';",
+"import { sha256 } from '@noble/hashes/sha256.js';",
+"import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils.js';",
 "",
 "export interface IterationResult {",
 "  python: string;",
