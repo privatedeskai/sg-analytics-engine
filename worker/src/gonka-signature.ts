@@ -1,4 +1,4 @@
-﻿import { secp256k1 } from '@noble/curves/secp256k1';
+﻿import { secp256k1 } from '@noble/curves/secp256k1.js';
 
 function hexToBytes(hex: string): Uint8Array {
   const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
