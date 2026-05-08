@@ -10,7 +10,8 @@ const GONKA_NODES = [
   'https://node2.gonka.ai',
   'https://node3.gonka.ai',
 ];
-const MODEL = 'moonshotai/Kimi-K2.6';
+// TD-007: модель Qwen3-235B (Kimi-K2.6 недоступна на node4, переключено в сессии 10)
+const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
 
 function hexToBytes(hex: string): Uint8Array {
   const h = hex.startsWith('0x') ? hex.slice(2) : hex;
@@ -80,14 +81,14 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
     try {
       const res = await fetch(node + '/v1/chat/completions', { method: 'POST', headers, body: payloadString });
       if (!res.ok) {
-        console.log('[KIMI] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 100));
+        console.log('[LLM] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 100));
         continue;
       }
       const text = await collectStream(res);
-      console.log('[KIMI] success node=' + node + ' chars=' + text.length);
+      console.log('[LLM] success node=' + node + ' chars=' + text.length);
       return text;
     } catch (e: any) {
-      console.log('[KIMI] ' + node + ' failed: ' + e.message);
+      console.log('[LLM] ' + node + ' failed: ' + e.message);
     }
   }
   throw new Error('All Gonka nodes failed');
@@ -102,7 +103,7 @@ export class KimiClient {
     const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nOne hypothesis only.';
     const t0 = Date.now();
     const raw = await this.call(sp, um, 2000);
-    console.log('[KIMI] iter=' + i + ' elapsed=' + (Date.now() - t0) + 'ms len=' + raw.length);
+    console.log('[LLM] iter=' + i + ' elapsed=' + (Date.now() - t0) + 'ms len=' + raw.length);
     return this.parse(raw, i);
   }
 
