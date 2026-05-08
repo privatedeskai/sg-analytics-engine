@@ -1,6 +1,6 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes, numberToBytesBE } from '@noble/curves/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 const NODES = [
   'http://node1.gonka.ai:8000',
@@ -14,14 +14,6 @@ function toBytes(hex: string): Uint8Array {
 
 function getAddress(pk: string): string {
   return 'gonka1' + bytesToHex(sha256(secp256k1.getPublicKey(toBytes(pk), true))).slice(0, 38);
-}
-
-function sigToBytes(sig: any): Uint8Array {
-  // Works across all @noble/curves versions: use toHex() which is always present
-  const hex = typeof sig.toHex === 'function'
-    ? sig.toHex()
-    : bytesToHex(numberToBytesBE(sig.r, 32)) + bytesToHex(numberToBytesBE(sig.s, 32));
-  return hexToBytes(hex);
 }
 
 async function getEndpoint(): Promise<{ url: string; address: string }> {
@@ -68,26 +60,12 @@ export default async function handler(req: any, res: any) {
     const payload = new TextEncoder().encode(body + ts + ep.address);
     const hash = sha256(payload);
     const sig = secp256k1.sign(hash, toBytes(pk));
-    const sigBytes = sigToBytes(sig);
-    const sigB64 = btoa(String.fromCharCode(...sigBytes));
 
-    const r = await fetch(ep.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': sigB64,
-        'X-Timestamp': ts,
-        'X-Requester-Address': getAddress(pk),
-      },
-      body,
-    });
+    // Diagnostic: return sig methods so we can see what's available on Vercel
+    const sigMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(sig));
+    const sigKeys = Object.keys(sig);
+    return res.status(200).json({ debug: true, sigMethods, sigKeys });
 
-    if (!r.ok) {
-      const e = await r.text();
-      return res.status(r.status).json({ error: e.slice(0, 500) });
-    }
-
-    return res.status(200).json(await r.json());
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
