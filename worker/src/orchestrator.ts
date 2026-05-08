@@ -10,6 +10,7 @@ const JUDGE0_TIMEOUT_MS = 15000;
 export interface Env {
   KV: KVNamespace;
   GONKA_PRIVATE_KEY: string;
+  GONKA_ADDRESS: string;
   CLAUDE_API_KEY: string;
   MAX_ITERATIONS?: string;
 }
@@ -78,7 +79,7 @@ export class AnalysisOrchestrator {
   }
 
   private async runAnalysis(sessionId: string, csvRaw: string, fileName: string, question: string, maxIter: number): Promise<void> {
-    const kimi = new KimiClient(this.env.GONKA_PRIVATE_KEY);
+    const kimi = new KimiClient(this.env.GONKA_PRIVATE_KEY, this.env.GONKA_ADDRESS);
     const formatter = new OutputFormatter();
     try {
       const connector = new CSVConnector();
