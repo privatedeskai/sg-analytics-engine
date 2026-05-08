@@ -95,7 +95,7 @@ export class KimiClient {
   constructor(private key: string, private address: string) {}
 
   async generateIteration(dd: string, q: string, sums: string[], i: number, max: number): Promise<IterationResult> {
-    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
+    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown, no think tags: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
     const cb = sums.length > 0 ? '\n\nKnown findings: ' + sums.map((s, j) => (j + 1) + ': ' + s).join('; ') : '';
     const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nOne hypothesis only.';
     const t0 = Date.now();
@@ -119,10 +119,17 @@ export class KimiClient {
     );
   }
 
+  private clean(raw: string): string {
+    return raw
+      .replace(/<think>[\s\S]*?<\/think>/g, '')
+      .replace(/```(?:json)?\n?/g, '')
+      .replace(/```/g, '')
+      .trim();
+  }
+
   private parse(raw: string, i: number): IterationResult {
     try {
-      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
-      const p = JSON.parse(clean);
+      const p = JSON.parse(this.clean(raw));
       return {
         python: this.extractCode(p.python || ''),
         summary: (p.summary || '').slice(0, 200),
@@ -130,6 +137,7 @@ export class KimiClient {
         reason: (p.reason || '').slice(0, 100),
       };
     } catch (_) {
+      console.log('[KIMI] parse failed iter=' + i + ' raw=' + raw.slice(0, 200));
       return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
     }
   }
