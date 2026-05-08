@@ -60,7 +60,7 @@ export default async function handler(req: any, res: any) {
     const payload = new TextEncoder().encode(body + ts + ep.address);
     const hash = sha256(payload);
     const sig = secp256k1.sign(hash, toBytes(pk));
-    const sigBytes = sig.toCompactBytes();
+    const sigBytes = sig.toBytes();
     const sigB64 = btoa(String.fromCharCode(...sigBytes));
 
     const r = await fetch(ep.url, {
