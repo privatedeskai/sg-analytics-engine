@@ -1,7 +1,7 @@
 # SG Analytics Engine — Статус проекта
 **Этап:** Э1 — Универсальный CSV Analyst + Gonka-ready фундамент
-**Обновлено:** 2026-05-06
-**Сессия:** 8
+**Обновлено:** 2026-05-08
+**Сессия:** 10
 
 ---
 
@@ -20,7 +20,7 @@ Web App: https://web-app-liart-gamma.vercel.app
 
 ## Команды деплоя
 Worker:     cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler deploy
-Web App:    cd C:\Users\dorof\Documents\sg-analytics-engine\web-app ; npx vercel --prod --yes ; cd ..
+Web App:    cd C:\Users\dorof\Documents\sg-analytics-engine\web-app ; npx vercel --prod --yes
 Checkpoint: git add . ; git commit -m "checkpoint: [описание]" ; git push
 
 ---
@@ -33,19 +33,22 @@ Checkpoint: git add . ; git commit -m "checkpoint: [описание]" ; git pus
 | Worker деплой | ✅ | /status, /analyze, /result/:id |
 | KV хранилище | ✅ | сессии пишутся и читаются корректно |
 | Оркестратор | ✅ | AnalysisOrchestrator, 10 итераций, алгоритм Вариант 2 |
-| Judge0 CE | ✅ | ce.judge0.com, без ключа |
-| kimi.ts | ⚠️ | Kimi K2.5 на DeepInfra — thinking mode не отключается (TD-001) |
+| Judge0 CE | ✅ | ce.judge0.com, polling по статусу, ~2 сек |
+| kimi.ts (llm.ts) | ✅ | Qwen3-235B через Gonka node4, прямой вызов без прокси |
+| ECDSA подпись | ✅ | @noble/curves, secp256k1, lowS, compact base64 |
 | CSV загрузчик | ✅ | connectors/csv.ts |
 | Output formatter | ✅ | output.ts |
-| Алгоритм итераций | ✅ | Вариант 2: резюме между итерациями + ранний выход |
-| Диагностическое логирование | ✅ | SSE chunks, TTFT, reasoning_chunks, usage stats |
-| e2b.ts | ✅ | Unicode-safe base64 (TextEncoder/TextDecoder) |
+| Алгоритм итераций | ✅ | Вариант 2: резюме + ранний выход по enough=true |
 | UI — базовый | ✅ | тёмная тема, DM Sans, shimmer accent |
-| UI — прогресс без перерисовки | ⬜ | замечание из тестирования сессии 8 |
+| UI — дашборд результатов | ✅ | переключается на результат после completed |
+| UI — resizer | ✅ | drag между чатом и дашбордом работает |
+| UI — график | ⚠️ | не отображается когда модель возвращает строки вместо чисел (TD-008) |
+| UI — прогресс без перерисовки | ✅ | обновляются только текст и полоска |
+| vercel.json Cache-Control | ✅ | no-store для HTML |
 | DESIGN.md | ✅ | дизайн-система зафиксирована в репо |
-| DECISIONS.md | ✅ | Instant vs Thinking mode задокументирован |
+| DECISIONS.md | ✅ | все решения задокументированы |
 | Gonka API коннектор | ⬜ | connectors/gonka.ts — не начат |
-| Cron накопление истории Gonka | ⬜ | не начат |
+| Cron накопление истории Gonka | ⬜ | не начат — каждый день промедления потеря истории |
 | Stripe биллинг | ⬜ | не начат |
 
 ---
@@ -54,71 +57,61 @@ Checkpoint: git add . ; git commit -m "checkpoint: [описание]" ; git pus
 
 | ID | Описание | Триггер возврата |
 |----|----------|-----------------|
-| TD-001 | Kimi на DeepInfra не работает (thinking mode) → нужен gonka-openai SDK | Получить GONKA_PRIVATE_KEY через inferenced CLI |
 | TD-003 | Таймауты в orchestrator.ts — оценить после стабилизации | После 3 успешных тестов подряд |
+| TD-006 | @cosmjs/crypto security warning в gonka-openai SDK | Выход gonka-openai 0.3.x+ |
+| TD-007 | kimi.ts — переименовать в llm.ts, логи [KIMI] → [LLM] | Следующая сессия |
+| TD-008 | График пустой когда output содержит строки вместо чисел | Следующая сессия |
 
 Подробности — в TECH_DEBT.md
 
 ---
 
-## Что сделано в сессии 8
+## Что сделано в сессии 10
 
-### Диагностика AI-провайдера (главный результат сессии)
-- Найдена корневая причина всех проблем: Kimi K2.5/K2.6 — thinking модель
-- Thinking mode включён по умолчанию и тратит все токены на reasoning_content
-- DeepInfra игнорирует параметр `thinking: {type: "disabled"}` — баг провайдера
-- Итерации 2+ возвращают content_chars=0, reasoning_chunks=1400+ при max_tokens=1500
-- Добавлено детальное SSE логирование: TTFT, chunks, reasoning_chunks, usage stats
+### Главный результат — TD-007 закрыт
+- kimi.ts переписан: прямой вызов Gonka API из CF Worker без Vercel прокси
+- ECDSA подпись через @noble/curves: secp256k1.sign возвращает Uint8Array напрямую (compact 64 байта)
+- Схема подписи: SHA256(body + timestampNs + providerAddress) → compact base64
+- Заголовки: Authorization, X-Requester-Address, X-Timestamp
+- Fallback по нодам: node4 → node1 → node2 → node3
 
-### Стратегическое решение
-- Принято решение перейти на gonka-openai TypeScript SDK как целевой AI-провайдер
-- SDK совместим с CF Workers (nodejs_compat=true уже включён)
-- Kimi K2.6 через Gonka — решает thinking mode, бесплатно, стратегически правильно
+### Тестирование моделей
+- **Kimi-K2.6** на node4.gonka.ai → chars=0 (модель недоступна на этой ноде)
+- **Qwen/Qwen3-235B-A22B-Instruct-2507-FP8** на node4.gonka.ai → работает, 6-15 сек на итерацию, ранний выход
 
-### Gonka Lens — концепция утверждена
-- Разработана и зафиксирована полная концепция Gonka Lens
-- Проверен реальный JSON от Gonka API: weight, voting_powers, models — всё для MVP
-- Архитектура и план до первой версии задокументированы в PROJECT_INSTRUCTIONS.md
-- Gonka Lens — отдельный продукт, строится на фундаменте этого движка
+### Judge0 ускорение
+- Было: wait=true + фиксированный таймаут 15 сек → реально 25-30 сек
+- Стало: async polling по статусу 500ms интервал → реально 2 сек
+- Orchestrator: жёсткие таймауты → потолки (ceiling) как страховка
 
-### Технические правки
-- wrangler.toml: MAX_ITERATIONS="5" (было "10") — исправлен root cause бага 4/10
-- orchestrator.ts: KIMI_TIMEOUT_MS=30000, алгоритм Вариант 2
-- DECISIONS.md: задокументированы Instant vs Thinking mode, архитектура агента
+### UI исправления
+- Дашборд переключается на результат после completed ✅
+- Poll останавливается при completed (флаг done) ✅
+- Resizer между панелями — drag работает ✅
+- vercel.json Cache-Control no-store для HTML ✅
+- Парсинг Python dict с одинарными кавычками → JSON ✅
+
+### Производительность
+- Полный pipeline: ~25 сек (было ~38 сек)
+- Judge0: ~2 сек (было ~25 сек)
+- Qwen на Gonka: 6-15 сек на итерацию
 
 ---
 
-## Первые шаги сессии 9
+## Первые шаги сессии 11
 
-### Приоритет 1 — Закрыть TD-001: gonka-openai SDK
+### Приоритет 1 — TD-007: переименование
+- kimi.ts → llm.ts (или оставить kimi.ts но исправить логи)
+- Логи [KIMI] → [LLM] или [QWEN]
 
-1. Установить inferenced CLI (Linux/WSL):
-```bash
-# Скачать с https://gonka.ai/docs/developer/quickstart/
-chmod +x inferenced
-inferenced create-client sg-analytics --node-address http://node2.gonka.ai:8000
-inferenced keys export sg-analytics --unarmored-hex --unsafe
-```
+### Приоритет 2 — TD-008: график
+- buildChartData: поддержка когда result содержит {category: 'growth'/'decline'}
+- Показывать bar chart с +1/-1 или цветовую легенду растущих/падающих
 
-2. Добавить ключ в Cloudflare:
-```powershell
-cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npx wrangler secret put GONKA_PRIVATE_KEY
-```
-
-3. Установить gonka-openai SDK и переписать kimi.ts:
-```powershell
-cd C:\Users\dorof\Documents\sg-analytics-engine\worker ; npm install gonka-openai
-```
-
-4. Тест pipeline: загрузить test-analytics.csv, вопрос "Какие категории растут, какие падают?"
-
-### Приоритет 2 — UI: прогресс без перерисовки
-Прогресс-карточка рендерится один раз при старте анализа.
-При каждом poll обновляются только: текст сообщения, счётчик, ширина полоски.
-Без innerHTML = ... на каждом обновлении.
-
-### Приоритет 3 — Gonka коннектор + Cron (запустить накопление истории)
-Каждый день промедления — потерянная история эпох которую не восстановить.
+### Приоритет 3 — Gonka коннектор + Cron
+- Каждый день промедления — потерянная история эпох которую не восстановить
+- GET http://node2.gonka.ai:8000/v1/epochs/current/participants
+- Cron каждые 6ч → KV: gonka:epoch:{id}
 
 ---
 
@@ -160,43 +153,12 @@ Unicode-safe base64, исправлен kimi.ts, UI poll timeout 10 минут, 
 DeepInfra игнорирует thinking:disabled. Решение: gonka-openai SDK (TD-001).
 Утверждена концепция Gonka Lens. Все документы обновлены.
 
-## Что сделано в сессии 09
+### Сессия 9 — 2026-05-07
+GONKA_PRIVATE_KEY сгенерирован. Vercel прокси архитектура реализована.
+Найдена реальная структура Gonka API: response.active_participants[0].participants[N].
 
-### Главный результат
-- Новый GONKA_PRIVATE_KEY сгенерирован (address: gonka153la5nagprxzt3hf2nqve68yxdqr2zay2ue5yj)
-- GONKA_PRIVATE_KEY добавлен в Cloudflare secrets и Vercel Environment Variables
-- Реализована Vercel proxy архитектура: CF Worker → Vercel /api/gonka → Gonka ноды
-- gonka-openai SDK удалён из Worker (несовместим с CF Workers из-за @cosmjs/crypto)
-- kimi.ts переписан: Worker вызывает Vercel прокси через fetch
-- web-app/api/gonka.ts создан: ECDSA подпись через @noble/curves + прокси к Gonka
-- Worker деплоится успешно (39 KiB вместо 3493 KiB)
-- Vercel функция отвечает корректно
-- Найдена реальная структура Gonka API: response.active_participants[0].participants[N]
-
-### Текущая ошибка
-- Proxy 500: No endpoints — неправильный парсинг структуры ответа
-- Исправление готово но ещё не задеплоено
-
-### Первые шаги сессии 10
-1. Задеплоить исправленный web-app/api/gonka.ts (функция getEndpoint уже исправлена в GitHub)
-2. git pull → npx vercel --prod --yes
-3. Протестировать полный pipeline
-### Главный результат
-- Новый GONKA_PRIVATE_KEY сгенерирован (address: gonka153la5nagprxzt3hf2nqve68yxdqr2zay2ue5yj)
-- GONKA_PRIVATE_KEY добавлен в Cloudflare secrets и Vercel Environment Variables
-- Реализована Vercel proxy архитектура: CF Worker → Vercel /api/gonka → Gonka ноды
-- gonka-openai SDK удалён из Worker (несовместим с CF Workers из-за @cosmjs/crypto)
-- kimi.ts переписан: Worker вызывает Vercel прокси через fetch
-- web-app/api/gonka.ts создан: ECDSA подпись через @noble/curves + прокси к Gonka
-- Worker деплоится успешно (39 KiB вместо 3493 KiB)
-- Vercel функция отвечает корректно
-
-### Текущая ошибка
-- Proxy 500: Error: No endpoints
-- Vercel не может распарсить список участников от Gonka нод
-- Причина: структура JSON ответа Gonka API отличается от ожидаемой
-
-### Первые шаги сессии 10
-1. Проверить реальную структуру ответа Gonka API
-2. Исправить парсинг в web-app/api/gonka.ts
-3. Задеплоить и протестировать полный pipeline
+### Сессия 10 — 2026-05-08
+TD-007 закрыт: прямой вызов Gonka API через @noble/curves ECDSA.
+Модель переключена на Qwen3-235B (Kimi недоступна на node4).
+Judge0 ускорен с 25 сек до 2 сек через polling по статусу.
+UI: дашборд работает, resizer работает, poll останавливается корректно.
