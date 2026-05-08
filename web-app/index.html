@@ -351,7 +351,6 @@ function showResults(data) {
   const parsed = outputs.map(raw => {
     if (!raw) return null;
     try { return JSON.parse(raw); } catch {}
-    // Python dict → JSON: одинарные кавычки → двойные, True/False/None
     try {
       const fixed = raw
         .replace(/'/g, '"')
@@ -377,7 +376,7 @@ function showResults(data) {
   }
 
   if (chartData) {
-    html += '<div class="chart-card"><div class="chart-header"><div><div class="chart-title">Динамика по категориям</div><div class="chart-sub">'+iterCount+' итераций · Judge0 CE</div></div><div class="chart-badge">Завершён</div></div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>';
+    html += '<div class="chart-card"><div class="chart-header"><div><div class="chart-title">'+chartData.title+'</div><div class="chart-sub">'+iterCount+' итераций · Judge0 CE</div></div><div class="chart-badge">Завершён</div></div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>';
   }
 
   html += '<div class="summary-card"><div class="summary-header">Итоги анализа</div><div class="summary-text" id="sumText"></div></div>';
@@ -389,13 +388,18 @@ function showResults(data) {
   if (chartData) {
     const ctx = document.getElementById("mainChart");
     if (ctx) {
-      const bg  = ["rgba(59,130,246,.75)","rgba(16,185,129,.75)","rgba(139,92,246,.75)","rgba(245,158,11,.75)","rgba(239,68,68,.75)","rgba(20,184,166,.75)"];
-      const brd = ["rgba(59,130,246,1)","rgba(16,185,129,1)","rgba(139,92,246,1)","rgba(245,158,11,1)","rgba(239,68,68,1)","rgba(20,184,166,1)"];
-      // Раскрашиваем: положительные — зелёный, отрицательные — красный
-      const barBg  = chartData.values.map(v => v>=0 ? "rgba(16,185,129,.75)" : "rgba(239,68,68,.75)");
-      const barBrd = chartData.values.map(v => v>=0 ? "rgba(16,185,129,1)"   : "rgba(239,68,68,1)");
+      // TD-008 fix: цвет по знаку для числовых данных, иначе палитра
+      const isNumericValues = chartData.values.every(v => typeof v === "number");
+      const palette = ["rgba(59,130,246,.75)","rgba(16,185,129,.75)","rgba(139,92,246,.75)","rgba(245,158,11,.75)","rgba(239,68,68,.75)","rgba(20,184,166,.75)"];
+      const paletteB = ["rgba(59,130,246,1)","rgba(16,185,129,1)","rgba(139,92,246,1)","rgba(245,158,11,1)","rgba(239,68,68,1)","rgba(20,184,166,1)"];
+      const barBg  = isNumericValues
+        ? chartData.values.map(v => v >= 0 ? "rgba(16,185,129,.75)" : "rgba(239,68,68,.75)")
+        : chartData.values.map((_, i) => palette[i % palette.length]);
+      const barBrd = isNumericValues
+        ? chartData.values.map(v => v >= 0 ? "rgba(16,185,129,1)" : "rgba(239,68,68,1)")
+        : chartData.values.map((_, i) => paletteB[i % paletteB.length]);
       currentChart = new Chart(ctx.getContext("2d"), {
-        type:"bar",
+        type: chartData.type || "bar",
         data:{ labels:chartData.labels, datasets:[{data:chartData.values, backgroundColor:barBg, borderColor:barBrd, borderWidth:1, borderRadius:6}] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
           scales:{ y:{beginAtZero:false,grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#64748B",font:{family:"'DM Mono'",size:11}}}, x:{grid:{display:false},ticks:{color:"#64748B",font:{size:12}}} } }
@@ -405,34 +409,76 @@ function showResults(data) {
 }
 
 // ── DATA EXTRACTION ───────────────────────────────────────────────────────────
-// Ищем объект вида {CategoryName: number, ...} — это и есть наши данные
+// TD-008 fix: поддержка строковых меток + числовых значений, смешанных объектов
 function buildChartData(parsed) {
+  // Попытка 1: result содержит объект {label: number, ...}
   for (const obj of parsed) {
     const result = obj?.result;
     if (!result || typeof result !== "object" || Array.isArray(result)) continue;
     const entries = Object.entries(result).filter(([,v]) => typeof v === "number");
     if (entries.length >= 2) {
-      return { labels: entries.map(([k])=>k), values: entries.map(([,v])=>v) };
+      return {
+        title: "Динамика по категориям",
+        type: "bar",
+        labels: entries.map(([k]) => k),
+        values: entries.map(([,v]) => v)
+      };
     }
   }
-  // fallback — ищем любой объект с числовыми значениями
+
+  // Попытка 2: result содержит {category: string, value: number} — одна запись
+  // Собираем все такие пары из всех итераций в один график
+  const catValuePairs = [];
   for (const obj of parsed) {
-    function findNumObj(o) {
-      if (!o||typeof o!=="object"||Array.isArray(o)) return null;
-      const entries = Object.entries(o).filter(([,v])=>typeof v==="number");
-      if (entries.length>=2) return { labels:entries.map(([k])=>k), values:entries.map(([,v])=>v) };
-      for (const v of Object.values(o)) { const r=findNumObj(v); if(r) return r; }
+    const r = obj?.result;
+    if (r && typeof r === "object" && !Array.isArray(r)) {
+      const keys = Object.keys(r);
+      // Ищем пару (строка, число) в объекте
+      const strKeys = keys.filter(k => typeof r[k] === "string");
+      const numKeys = keys.filter(k => typeof r[k] === "number" && isFinite(r[k]));
+      if (strKeys.length >= 1 && numKeys.length >= 1) {
+        catValuePairs.push({ label: String(r[strKeys[0]]), value: r[numKeys[0]] });
+      }
+    }
+  }
+  if (catValuePairs.length >= 2) {
+    return {
+      title: "Сравнение по категориям",
+      type: "bar",
+      labels: catValuePairs.map(p => p.label),
+      values: catValuePairs.map(p => p.value)
+    };
+  }
+
+  // Попытка 3: рекурсивный поиск любого объекта с числовыми значениями
+  for (const obj of parsed) {
+    function findNumObj(o, depth) {
+      if (!o || typeof o !== "object" || Array.isArray(o) || depth > 3) return null;
+      const entries = Object.entries(o).filter(([,v]) => typeof v === "number" && isFinite(v));
+      if (entries.length >= 2) {
+        return {
+          title: "Данные анализа",
+          type: "bar",
+          labels: entries.map(([k]) => k),
+          values: entries.map(([,v]) => v)
+        };
+      }
+      for (const v of Object.values(o)) {
+        const r = findNumObj(v, depth + 1);
+        if (r) return r;
+      }
       return null;
     }
-    const r = findNumObj(obj);
+    const r = findNumObj(obj, 0);
     if (r) return r;
   }
+
   return null;
 }
 
 function buildMetrics(parsed) {
   const out=[], seen=new Set();
-  const kw=["total","revenue","sales","profit","units","count","avg","sum","margin","rate","pct","growth"];
+  const kw=["total","revenue","sales","profit","units","count","avg","sum","margin","rate","pct","growth","price","amount","value"];
   for (const obj of parsed) {
     function scan(o) {
       if (!o||typeof o!=="object") return;
