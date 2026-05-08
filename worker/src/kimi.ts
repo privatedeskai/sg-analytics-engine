@@ -10,7 +10,7 @@ const GONKA_NODES = [
   'https://node2.gonka.ai',
   'https://node3.gonka.ai',
 ];
-const MODEL = 'moonshotai/Kimi-K2.6';
+const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
 
 function hexToBytes(hex: string): Uint8Array {
   const h = hex.startsWith('0x') ? hex.slice(2) : hex;
@@ -78,7 +78,7 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
     try {
       const res = await fetch(node + '/v1/chat/completions', { method: 'POST', headers, body: payloadString });
       if (!res.ok) {
-        console.log('[KIMI] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 100));
+        console.log('[KIMI] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 200));
         continue;
       }
       const text = await collectStream(res);
