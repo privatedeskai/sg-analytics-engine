@@ -8,6 +8,7 @@
   "dependencies": {
     "@e2b/code-interpreter": "^2.4.2",
     "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0"
+    "@noble/hashes": "^2.2.0",
+    "gonka-openai": "^0.2.6"
   }
 }
