@@ -1,6 +1,6 @@
 import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes } from '@noble/curves/abstract/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 const NODES = [
   'http://node1.gonka.ai:8000',
