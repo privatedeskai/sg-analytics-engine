@@ -38,10 +38,9 @@ async function buildSignature(
 ): Promise<{ authHeader: string; timestamp: string }> {
   const hash = await sha256Bytes(payloadString + timestampNs.toString() + providerAddress);
   const sig = secp256k1.sign(hash, hexToBytes(privateKeyHex), { lowS: true });
-  const r = sig.r.toString(16).padStart(64, '0');
-  const s = sig.s.toString(16).padStart(64, '0');
+  const compact = sig.toCompactRawBytes();
   return {
-    authHeader: bytesToBase64(hexToBytes(r + s)),
+    authHeader: bytesToBase64(compact),
     timestamp: timestampNs.toString(),
   };
 }
