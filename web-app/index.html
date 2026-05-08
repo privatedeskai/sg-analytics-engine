@@ -71,4 +71,407 @@ body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2
 .messages::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
 .msg-user { background: var(--bg5); border: 1px solid var(--border2); border-radius: 12px 12px 3px 12px; padding: 9px 13px; font-size: 13px; align-self: flex-end; max-width: 88%; line-height: 1.55; }
 .msg-ai { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.18); border-left: 2px solid var(--accent); border-radius: 3px 12px 12px 12px; padding: 10px 13px; font-size: 13px; line-height: 1.65; max-width: 96%; }
-.msg-ai
+.msg-ai b { color: var(--accent2); font-weight: 600; }
+.msg-progress { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; font-size: 11px; color: var(--t2); font-family: 'DM Mono', monospace; }
+.pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex-shrink: 0; animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
+.msg-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 9px 13px; font-size: 12px; color: #FCA5A5; }
+
+.input-area { padding: 12px 16px 14px; border-top: 1px solid var(--border); flex-shrink: 0; background: rgba(8,12,24,0.4); }
+.input-wrap { display: flex; align-items: flex-end; gap: 8px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 12px; transition: border-color 0.2s, box-shadow 0.2s; }
+.input-wrap:focus-within { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 0 3px rgba(59,130,246,0.08); }
+.input-wrap textarea { flex: 1; background: transparent; border: none; outline: none; font-size: 13px; color: var(--t1); font-family: 'DM Sans', sans-serif; resize: none; min-height: 20px; max-height: 100px; line-height: 1.5; }
+.input-wrap textarea::placeholder { color: var(--t4); }
+.send-btn { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; box-shadow: 0 2px 10px rgba(59,130,246,0.3); }
+.send-btn:hover { transform: translateY(-1px); }
+.send-btn:disabled { background: var(--bg5); cursor: not-allowed; transform: none; box-shadow: none; }
+.input-hint { font-size: 10px; color: var(--t4); margin-top: 8px; text-align: center; }
+
+.dash-header { padding: 14px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: rgba(8,12,24,0.7); }
+.dash-live { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--green2); }
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse 1.4s infinite; }
+.dash-content { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: thin; scrollbar-color: var(--bg4) transparent; }
+.dash-content::-webkit-scrollbar { width: 3px; }
+.dash-content::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.kpi-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px; transition: all 0.2s; position: relative; overflow: hidden; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--purple)); opacity: 0; transition: opacity 0.2s; }
+.kpi-card:hover { border-color: var(--border2); transform: translateY(-1px); }
+.kpi-card:hover::before { opacity: 1; }
+.kpi-label { font-size: 10px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+.kpi-value { font-size: 26px; font-weight: 600; color: var(--t1); letter-spacing: -1px; line-height: 1; margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+.kpi-delta { font-size: 11px; font-weight: 500; }
+.kpi-delta.up { color: var(--green2); }
+.kpi-delta.down { color: #FCA5A5; }
+.kpi-delta.neutral { color: var(--t3); }
+
+.chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.chart-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+.chart-title { font-size: 14px; font-weight: 600; color: var(--t1); letter-spacing: -0.2px; }
+.chart-sub { font-size: 11px; color: var(--t3); margin-top: 3px; font-family: 'DM Mono', monospace; }
+.chart-badge { font-size: 10px; padding: 3px 9px; border-radius: 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: var(--accent2); font-weight: 500; }
+.chart-wrapper { position: relative; height: 220px; }
+
+.progress-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+.progress-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.progress-title { font-size: 12px; font-weight: 500; color: var(--t2); display: flex; align-items: center; gap: 8px; }
+.progress-count { font-size: 11px; color: var(--t3); font-family: 'DM Mono', monospace; }
+.progress-track { height: 3px; background: var(--bg5); border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 2px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 0 8px rgba(59,130,246,0.5); }
+.progress-msg { font-size: 10px; color: var(--t3); font-family: 'DM Mono', monospace; }
+
+.summary-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.summary-header { font-size: 10px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.summary-header::before { content: ''; width: 3px; height: 13px; background: linear-gradient(180deg, var(--accent), var(--purple)); border-radius: 2px; }
+.summary-text { font-size: 13px; color: var(--t2); line-height: 1.75; white-space: pre-wrap; }
+
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 60px 40px; }
+.empty-icon { width: 60px; height: 60px; border-radius: 18px; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 26px; }
+.empty-title { font-size: 16px; font-weight: 600; color: var(--t2); }
+.empty-sub { font-size: 13px; color: var(--t3); max-width: 300px; line-height: 1.65; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.kpi-card { animation: fadeUp 0.35s ease both; }
+.chart-card { animation: fadeUp 0.35s ease 0.1s both; }
+.summary-card { animation: fadeUp 0.35s ease 0.2s both; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-mark">SG</div>
+    <div class="logo-name">Analytics <span>Engine</span></div>
+  </div>
+  <div class="header-right">
+    <div class="status-row">
+      <div class="status-dot"></div>
+      <span id="headerStatus">Готов</span>
+    </div>
+    <div class="pill active">Э1 · CSV Analyst</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="chat-panel" id="chatPanel">
+    <div class="panel-header">
+      <div class="panel-label">Аналитик</div>
+      <div class="pill">CSV</div>
+    </div>
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon-wrap">📂</div>
+      <div class="upload-title">Загрузить данные</div>
+      <div class="upload-sub">Перетащи CSV или <strong>нажми для загрузки</strong></div>
+      <div class="upload-file-name" id="uploadFilename"></div>
+      <input type="file" id="fileInput" accept=".csv,.txt" style="display:none">
+    </div>
+    <div class="messages" id="messages">
+      <div class="msg-ai">Привет. Загрузи CSV и задай вопрос — я проанализирую данные и покажу результаты на дашборде.</div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="chatInput" placeholder="Задай вопрос о данных..." rows="1"></textarea>
+        <button class="send-btn" id="sendBtn" disabled>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 11.5L11.5 6.5L1.5 1.5V5.5L8.5 6.5L1.5 7.5V11.5Z" fill="white"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter — отправить · Shift+Enter — перенос</div>
+    </div>
+  </div>
+
+  <div class="resizer" id="resizer">
+    <div class="resizer-dots">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div class="dash-panel" id="dashPanel">
+    <div class="dash-header">
+      <div class="panel-label">Дашборд — обновляется в реальном времени</div>
+      <div class="dash-live" id="dashLive" style="display:none">
+        <div class="live-dot"></div>
+        <span id="dashLiveText">Анализирую...</span>
+      </div>
+    </div>
+    <div class="dash-content" id="dashContent">
+      <div class="empty-state">
+        <div class="empty-icon">⚡</div>
+        <div class="empty-title">Дашборд ждёт данных</div>
+        <div class="empty-sub">Загрузи CSV файл и задай вопрос — метрики и графики появятся здесь в реальном времени</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKER_URL = "https://sg-analytics-engine.dorofeevov17.workers.dev";
+const MAX_ITERATIONS = 10;
+let csvContent = null, isAnalyzing = false, currentChart = null, progressInited = false;
+
+// ── RESIZER ───────────────────────────────────────────────────────────────────
+const resizer   = document.getElementById("resizer");
+const chatPanel = document.getElementById("chatPanel");
+
+resizer.addEventListener("mousedown", e => {
+  e.preventDefault();
+  resizer.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  const startX = e.clientX;
+  const startW = chatPanel.offsetWidth;
+  function onMove(e) {
+    const w = Math.max(220, Math.min(startW + e.clientX - startX, window.innerWidth * 0.75));
+    chatPanel.style.width = w + "px";
+  }
+  function onUp() {
+    resizer.classList.remove("dragging");
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+});
+
+// ── FILE UPLOAD ───────────────────────────────────────────────────────────────
+const uploadZone     = document.getElementById("uploadZone");
+const fileInput      = document.getElementById("fileInput");
+const uploadFilename = document.getElementById("uploadFilename");
+const messages       = document.getElementById("messages");
+const chatInput      = document.getElementById("chatInput");
+const sendBtn        = document.getElementById("sendBtn");
+const dashContent    = document.getElementById("dashContent");
+const dashLive       = document.getElementById("dashLive");
+const dashLiveText   = document.getElementById("dashLiveText");
+const headerStatus   = document.getElementById("headerStatus");
+
+uploadZone.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
+uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+uploadZone.addEventListener("drop", e => { e.preventDefault(); uploadZone.classList.remove("drag-over"); handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    csvContent = e.target.result;
+    uploadZone.classList.add("has-file");
+    uploadFilename.textContent = "✓ " + file.name;
+    uploadZone.querySelector(".upload-title").textContent = "Файл загружен";
+    uploadZone.querySelector(".upload-sub").innerHTML = file.name + " · " + (file.size/1024).toFixed(1) + " KB";
+    sendBtn.disabled = false;
+    chatInput.placeholder = "Что хочешь узнать из этих данных?";
+    addMsg("ai", "**" + file.name + "** загружен · строк: ~" + (csvContent.split('\n').length - 1) + "\nЗадай вопрос.");
+  };
+  reader.readAsText(file);
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+chatInput.addEventListener("keydown", e => { if (e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); sendMessage(); } });
+chatInput.addEventListener("input", () => { chatInput.style.height="auto"; chatInput.style.height=Math.min(chatInput.scrollHeight,100)+"px"; });
+sendBtn.addEventListener("click", sendMessage);
+
+function sendMessage() {
+  const q = chatInput.value.trim();
+  if (!q || !csvContent || isAnalyzing) return;
+  chatInput.value = ""; chatInput.style.height = "auto";
+  startAnalysis(q);
+}
+
+// ── MESSAGES ──────────────────────────────────────────────────────────────────
+function addMsg(type, text) {
+  const div = document.createElement("div");
+  if      (type==="user") { div.className="msg-user"; div.textContent=text; }
+  else if (type==="ai")   { div.className="msg-ai"; div.innerHTML=fmt(text); }
+  else if (type==="prog") { div.className="msg-progress"; div.innerHTML='<div class="pulse-dot"></div><span>'+text+'</span>'; div.id="progressMsg"; }
+  else if (type==="err")  { div.className="msg-error"; div.textContent=text; }
+  messages.appendChild(div);
+  div.scrollIntoView({behavior:"smooth",block:"start"});
+  return div;
+}
+function updProg(t) { const el=document.getElementById("progressMsg"); if(el) el.querySelector("span").textContent=t; }
+function delProg()  { const el=document.getElementById("progressMsg"); if(el) el.remove(); }
+function fmt(t)     { return t.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>"); }
+
+// ── PROGRESS DASHBOARD ────────────────────────────────────────────────────────
+function initProgress(total) {
+  progressInited = true;
+  dashContent.innerHTML = `
+    <div class="progress-card">
+      <div class="progress-row">
+        <div class="progress-title"><div class="pulse-dot"></div><span id="progMsg">Инициализация...</span></div>
+        <div class="progress-count" id="progCount">0 / ${total}</div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
+      <div class="progress-msg" id="progSub">Python · Judge0 CE · итерационный анализ · 0%</div>
+    </div>
+    <div class="empty-state">
+      <div class="empty-icon">⚙️</div>
+      <div class="empty-title">Строю анализ</div>
+      <div class="empty-sub">Агент пишет Python, выполняет и итерирует.<br>Метрики появятся здесь.</div>
+    </div>`;
+}
+
+function updateProgress(iter, total, message) {
+  if (!progressInited) initProgress(total);
+  const pct = total>0 ? Math.round(iter/total*100) : 0;
+  const msg  = document.getElementById("progMsg");
+  const cnt  = document.getElementById("progCount");
+  const fill = document.getElementById("progFill");
+  const sub  = document.getElementById("progSub");
+  if (msg)  msg.textContent  = message || "Анализирую...";
+  if (cnt)  cnt.textContent  = iter + " / " + total;
+  if (fill) fill.style.width = pct + "%";
+  if (sub)  sub.textContent  = "Python · Judge0 CE · итерационный анализ · " + pct + "%";
+}
+
+// ── ANALYSIS ──────────────────────────────────────────────────────────────────
+async function startAnalysis(question) {
+  isAnalyzing = true; sendBtn.disabled = true; progressInited = false;
+  headerStatus.textContent = "Анализирую...";
+  dashLive.style.display = "flex";
+  dashLiveText.textContent = "Запуск...";
+  addMsg("user", question);
+  addMsg("prog", "Запускаю анализ...");
+  initProgress(MAX_ITERATIONS);
+
+  let sessionId;
+  try {
+    const r = await fetch(WORKER_URL + "/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: MAX_ITERATIONS, language: "ru" }),
+    });
+    sessionId = (await r.json()).sessionId;
+  } catch(e) { delProg(); addMsg("err","Не удалось подключиться: "+e.message); reset(); return; }
+
+  let attempts = 0;
+  const poll = setInterval(async () => {
+    if (++attempts > 300) { clearInterval(poll); delProg(); addMsg("err","Таймаут. Попробуй снова."); reset(); return; }
+    try {
+      const data = await (await fetch(WORKER_URL + "/result/" + sessionId)).json();
+
+      if (data.status === "running") {
+        const iter  = data.iteration || 0;
+        const total = data.maxIterations || MAX_ITERATIONS;
+        const msg   = data.progressMessage || "Анализирую...";
+        updProg(msg + " (" + iter + "/" + total + ")");
+        updateProgress(iter, total, msg);
+        dashLiveText.textContent = "Итерация " + iter + " / " + total;
+      }
+
+      if (data.status === "completed") {
+        clearInterval(poll);
+        delProg();
+        const summary = (data.result && data.result.summary) ? data.result.summary : (data.summaries || []).join(" ") || "Анализ завершён.";
+        addMsg("ai", summary);
+        showResults(data);
+        dashLive.style.display = "none";
+        headerStatus.textContent = "Готов";
+        reset();
+      }
+
+      if (data.status === "error") {
+        clearInterval(poll); delProg();
+        addMsg("err", "Ошибка: " + (data.error || "неизвестная ошибка"));
+        dashLive.style.display = "none";
+        reset();
+      }
+    } catch(e) { console.warn("poll:", e); }
+  }, 2000);
+}
+
+function reset() { isAnalyzing = false; sendBtn.disabled = !csvContent; }
+
+// ── RESULTS ───────────────────────────────────────────────────────────────────
+function showResults(data) {
+  if (currentChart) { currentChart.destroy(); currentChart = null; }
+
+  const summary    = (data.result && data.result.summary) ? data.result.summary : "";
+  const iterCount  = data.iteration || 0;
+  const outputs    = data.outputs || [];
+
+  // Используем charts из result если есть — они уже готовы
+  const resultCharts  = (data.result && data.result.charts)  ? data.result.charts  : [];
+  const resultMetrics = (data.result && data.result.metrics) ? data.result.metrics : [];
+
+  const metrics   = resultMetrics.length > 0 ? resultMetrics : extractMetrics(outputs);
+  const chartData = resultCharts.length  > 0 ? parseResultChart(resultCharts[0]) : extractChartData(outputs);
+
+  let html = "";
+
+  if (metrics.length > 0) {
+    html += '<div class="kpi-grid">';
+    metrics.slice(0,4).forEach(m => {
+      html += '<div class="kpi-card"><div class="kpi-label">' + (m.label||m.name||"Метрика") + '</div><div class="kpi-value">' + (m.value||"-") + '</div>' + (m.delta ? '<div class="kpi-delta '+(m.cls||"neutral")+'">' + m.delta + '</div>' : '') + '</div>';
+    });
+    html += '</div>';
+  }
+
+  if (chartData && chartData.labels && chartData.labels.length > 0) {
+    html += '<div class="chart-card"><div class="chart-header"><div><div class="chart-title">Результаты анализа</div><div class="chart-sub">' + iterCount + ' итераций · Judge0 CE</div></div><div class="chart-badge">Завершён</div></div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>';
+  }
+
+  html += '<div class="summary-card"><div class="summary-header">Итоги анализа</div><div class="summary-text" id="summaryText"></div></div>';
+
+  dashContent.innerHTML = html;
+  const st = document.getElementById("summaryText");
+  if (st) st.innerHTML = fmt(summary);
+
+  if (chartData && chartData.labels && chartData.labels.length > 0) {
+    const ctx = document.getElementById("mainChart");
+    if (ctx) {
+      const colors = ["rgba(59,130,246,0.75)","rgba(16,185,129,0.75)","rgba(139,92,246,0.75)","rgba(245,158,11,0.75)","rgba(239,68,68,0.75)","rgba(20,184,166,0.75)"];
+      const borders= ["rgba(59,130,246,1)","rgba(16,185,129,1)","rgba(139,92,246,1)","rgba(245,158,11,1)","rgba(239,68,68,1)","rgba(20,184,166,1)"];
+      currentChart = new Chart(ctx.getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: chartData.labels,
+          datasets: [{ data: chartData.values, backgroundColor: colors.slice(0,chartData.labels.length), borderColor: borders.slice(0,chartData.labels.length), borderWidth:1, borderRadius:6 }]
+        },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:"rgba(255,255,255,0.04)"},ticks:{color:"#64748B",font:{family:"'DM Mono'",size:11}}}, x:{grid:{display:false},ticks:{color:"#64748B",font:{size:12}}} } }
+      });
+    }
+  }
+}
+
+// Парсит chart из формата result.charts (который генерирует output.ts)
+function parseResultChart(chart) {
+  if (!chart) return null;
+  // Формат: {type, title, labels, datasets:[{label, data, color}]}
+  if (chart.labels && chart.datasets && chart.datasets[0]) {
+    return { labels: chart.labels, values: chart.datasets[0].data };
+  }
+  return null;
+}
+
+// Fallback — извлекаем из сырых outputs
+function extractMetrics(outputs) {
+  const out=[], seen=new Set();
+  const kw=["revenue","sales","profit","units","orders","count","total","avg","sum","amount","margin","rate","pct","growth"];
+  const lm={total_revenue:"Выручка",revenue:"Выручка",total_sales:"Продажи",units:"Единиц",orders:"Заказов",profit:"Прибыль",margin:"Маржа",count:"Кол-во"};
+  function isM(k){ return kw.some(w=>k.toLowerCase().includes(w)); }
+  function fv(k,v){ const kl=k.toLowerCase(); if(kl.includes("pct")||kl.includes("rate")||kl.includes("margin")) return (typeof v==="number"?v.toFixed(1):v)+"%"; return fmtN(v); }
+  function scan(obj){ if(!obj||typeof obj!=="object") return; for(const [k,v] of Object.entries(obj)){ if(seen.has(k)) continue; if(typeof v==="number"&&isFinite(v)&&isM(k)){ seen.add(k); out.push({label:lm[k]||k.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),value:fv(k,v),delta:null,cls:"neutral"}); } if(out.length>=4) return; } for(const v of Object.values(obj)){ if(v&&typeof v==="object"&&!Array.isArray(v)&&out.length<4) scan(v); } }
+  for(const raw of outputs){ if(out.length>=4) break; try{ scan(typeof raw==="string"?JSON.parse(raw):raw); }catch{} }
+  return out;
+}
+
+function extractChartData(outputs) {
+  for(const raw of outputs){
+    try{
+      const d=typeof raw==="string"?JSON.parse(raw):raw;
+      function fa(o){ if(!o||typeof o!=="object") return null; if(Array.isArray(o)&&o.length>0&&typeof o[0]==="object"){ const ks=Object.keys(o[0]); if(ks.length>=2){ const lk=ks.find(k=>typeof o[0][k]==="string")||ks[0]; const vk=ks.find(k=>typeof o[0][k]==="number")||ks[1]; if(typeof o[0][vk]==="number") return{labels:o.map(r=>String(r[lk])),values:o.map(r=>Number(r[vk])||0)}; } } for(const v of Object.values(o)){ if(Array.isArray(v)&&v.length>0){const r=fa(v);if(r) return r;} } return null; }
+      const f=fa(d); if(f&&f.labels.length>0) return f;
+    }catch{}
+  }
+  return null;
+}
+
+function fmtN(n){ if(typeof n!=="number") return String(n); if(n>=1000000) return "$"+(n/1e6).toFixed(1)+"M"; if(n>=1000) return "$"+Number(n).toLocaleString(); if(n%1!==0) return n.toFixed(2); return String(n); }
+</script>
+</body>
+</html>
