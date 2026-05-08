@@ -1,4 +1,4 @@
-import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { secp256k1 } from '@noble/curves/secp256k1';
 
 export interface IterationResult {
   python: string; summary: string; enough: boolean; reason: string;
@@ -10,7 +10,7 @@ const GONKA_NODES = [
   'https://node2.gonka.ai',
   'https://node3.gonka.ai',
 ];
-const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
+const MODEL = 'moonshotai/Kimi-K2.6';
 
 function hexToBytes(hex: string): Uint8Array {
   const h = hex.startsWith('0x') ? hex.slice(2) : hex;
@@ -37,38 +37,26 @@ async function buildSignature(
   privateKeyHex: string
 ): Promise<{ authHeader: string; timestamp: string }> {
   const hash = await sha256Bytes(payloadString + timestampNs.toString() + providerAddress);
-  const compact = secp256k1.sign(hash, hexToBytes(privateKeyHex), { lowS: true }) as Uint8Array;
+  const sig = secp256k1.sign(hash, hexToBytes(privateKeyHex), { lowS: true });
+  const r = sig.r.toString(16).padStart(64, '0');
+  const s = sig.s.toString(16).padStart(64, '0');
   return {
-    authHeader: bytesToBase64(compact),
+    authHeader: bytesToBase64(hexToBytes(r + s)),
     timestamp: timestampNs.toString(),
   };
 }
 
 async function collectStream(response: Response): Promise<string> {
   const reader = response.body!.getReader();
-  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const decoder = new TextDecoder();
   let fullText = '';
-  let buffer = '';
-
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
+    for (const line of decoder.decode(value, { stream: true }).split('\n')) {
       if (!line.startsWith('data: ')) continue;
-      const s = line.slice(6).trim();
+      const s = line.slice(6);
       if (s === '[DONE]') continue;
-      try {
-        const c = JSON.parse(s)?.choices?.[0]?.delta?.content;
-        if (c) fullText += c;
-      } catch (_) {}
-    }
-  }
-  if (buffer.startsWith('data: ')) {
-    const s = buffer.slice(6).trim();
-    if (s && s !== '[DONE]') {
       try {
         const c = JSON.parse(s)?.choices?.[0]?.delta?.content;
         if (c) fullText += c;
@@ -92,7 +80,7 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
     try {
       const res = await fetch(node + '/v1/chat/completions', { method: 'POST', headers, body: payloadString });
       if (!res.ok) {
-        console.log('[KIMI] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 200));
+        console.log('[KIMI] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 100));
         continue;
       }
       const text = await collectStream(res);
@@ -109,7 +97,7 @@ export class KimiClient {
   constructor(private key: string, private address: string) {}
 
   async generateIteration(dd: string, q: string, sums: string[], i: number, max: number): Promise<IterationResult> {
-    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown, no think tags: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
+    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
     const cb = sums.length > 0 ? '\n\nKnown findings: ' + sums.map((s, j) => (j + 1) + ': ' + s).join('; ') : '';
     const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nOne hypothesis only.';
     const t0 = Date.now();
@@ -133,17 +121,10 @@ export class KimiClient {
     );
   }
 
-  private clean(raw: string): string {
-    return raw
-      .replace(/<think>[\s\S]*?<\/think>/g, '')
-      .replace(/```(?:json)?\n?/g, '')
-      .replace(/```/g, '')
-      .trim();
-  }
-
   private parse(raw: string, i: number): IterationResult {
     try {
-      const p = JSON.parse(this.clean(raw));
+      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+      const p = JSON.parse(clean);
       return {
         python: this.extractCode(p.python || ''),
         summary: (p.summary || '').slice(0, 200),
@@ -151,7 +132,6 @@ export class KimiClient {
         reason: (p.reason || '').slice(0, 100),
       };
     } catch (_) {
-      console.log('[KIMI] parse failed iter=' + i + ' raw=' + raw.slice(0, 200));
       return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
     }
   }
