@@ -46,15 +46,29 @@ async function buildSignature(
 
 async function collectStream(response: Response): Promise<string> {
   const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder('utf-8', { fatal: false });
   let fullText = '';
+  let buffer = '';
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    for (const line of decoder.decode(value, { stream: true }).split('\n')) {
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
-      const s = line.slice(6);
+      const s = line.slice(6).trim();
       if (s === '[DONE]') continue;
+      try {
+        const c = JSON.parse(s)?.choices?.[0]?.delta?.content;
+        if (c) fullText += c;
+      } catch (_) {}
+    }
+  }
+  if (buffer.startsWith('data: ')) {
+    const s = buffer.slice(6).trim();
+    if (s && s !== '[DONE]') {
       try {
         const c = JSON.parse(s)?.choices?.[0]?.delta?.content;
         if (c) fullText += c;
