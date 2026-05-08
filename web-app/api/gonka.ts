@@ -16,6 +16,10 @@ function getAddress(pk: string): string {
   return 'gonka1' + bytesToHex(sha256(secp256k1.getPublicKey(toBytes(pk), true))).slice(0, 38);
 }
 
+function toBase64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+
 async function getEndpoint(): Promise<{ url: string; address: string }> {
   for (const node of NODES) {
     try {
@@ -59,13 +63,31 @@ export default async function handler(req: any, res: any) {
     const ts = (Date.now() * 1000000).toString();
     const payload = new TextEncoder().encode(body + ts + ep.address);
     const hash = sha256(payload);
-    const sig = secp256k1.sign(hash, toBytes(pk));
 
-    // Diagnostic: return sig methods so we can see what's available on Vercel
-    const sigMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(sig));
-    const sigKeys = Object.keys(sig);
-    return res.status(200).json({ debug: true, sigMethods, sigKeys });
+    // On Vercel @noble/curves returns raw Uint8Array (compact 64 bytes r+s)
+    const sigRaw: any = secp256k1.sign(hash, toBytes(pk));
+    const sigBytes: Uint8Array = sigRaw instanceof Uint8Array
+      ? sigRaw
+      : sigRaw.toBytes?.() ?? hexToBytes(sigRaw.toHex?.() ?? '');
+    const sigB64 = toBase64(sigBytes);
 
+    const r = await fetch(ep.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': sigB64,
+        'X-Timestamp': ts,
+        'X-Requester-Address': getAddress(pk),
+      },
+      body,
+    });
+
+    if (!r.ok) {
+      const e = await r.text();
+      return res.status(r.status).json({ error: e.slice(0, 500) });
+    }
+
+    return res.status(200).json(await r.json());
   } catch (e) {
     return res.status(500).json({ error: String(e) });
   }
