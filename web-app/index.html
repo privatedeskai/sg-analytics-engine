@@ -9,132 +9,117 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 :root {
-  --bg:      #080C18;
-  --bg2:     #0C1120;
-  --bg3:     #111828;
-  --bg4:     #182236;
-  --bg5:     #1E2C44;
-  --border:  rgba(255,255,255,0.06);
-  --border2: rgba(255,255,255,0.12);
-  --accent:  #3B82F6;
-  --accent2: #93C5FD;
-  --purple:  #8B5CF6;
-  --green:   #10B981;
-  --green2:  #6EE7B7;
-  --t1:      #F8FAFC;
-  --t2:      #CBD5E1;
-  --t3:      #64748B;
-  --t4:      #334155;
+  --bg:#080C18;--bg2:#0C1120;--bg3:#111828;--bg4:#182236;--bg5:#1E2C44;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --accent:#3B82F6;--accent2:#93C5FD;--purple:#8B5CF6;
+  --green:#10B981;--green2:#6EE7B7;
+  --t1:#F8FAFC;--t2:#CBD5E1;--t3:#64748B;--t4:#334155;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t1); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--purple), var(--accent)); background-size: 200% 100%; animation: shimmer 4s linear infinite; z-index: 100; }
-@keyframes shimmer { 0%{background-position:0%} 100%{background-position:200%} }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::after{content:'';position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--accent));background-size:200% 100%;animation:shimmer 4s linear infinite;z-index:100}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
-.header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 54px; border-bottom: 1px solid var(--border); background: rgba(8,12,24,0.95); backdrop-filter: blur(20px); position: relative; z-index: 10; flex-shrink: 0; }
-.logo { display: flex; align-items: center; gap: 10px; }
-.logo-mark { width: 30px; height: 30px; background: linear-gradient(135deg, var(--accent), var(--purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; box-shadow: 0 0 20px rgba(59,130,246,0.35); }
-.logo-name { font-size: 15px; font-weight: 600; letter-spacing: -0.4px; }
-.logo-name span { color: var(--t3); font-weight: 400; }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.status-row { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--t2); }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
-.pill { font-size: 11px; font-weight: 500; padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border2); color: var(--t2); background: var(--bg3); font-family: 'DM Mono', monospace; }
-.pill.active { border-color: rgba(59,130,246,0.45); color: var(--accent2); background: rgba(59,130,246,0.1); }
+.header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;border-bottom:1px solid var(--border);background:rgba(8,12,24,.95);backdrop-filter:blur(20px);position:relative;z-index:10;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;box-shadow:0 0 20px rgba(59,130,246,.35)}
+.logo-name{font-size:15px;font-weight:600;letter-spacing:-.4px}
+.logo-name span{color:var(--t3);font-weight:400}
+.header-right{display:flex;align-items:center;gap:12px}
+.status-row{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--t2)}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.pill{font-size:11px;font-weight:500;padding:4px 11px;border-radius:20px;border:1px solid var(--border2);color:var(--t2);background:var(--bg3);font-family:'DM Mono',monospace}
+.pill.active{border-color:rgba(59,130,246,.45);color:var(--accent2);background:rgba(59,130,246,.1)}
 
-.main { display: flex; flex: 1; overflow: hidden; }
+.main{display:flex;flex:1;overflow:hidden}
 
-.chat-panel { width: 380px; min-width: 220px; max-width: 70%; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg2); position: relative; z-index: 2; overflow: hidden; }
+.chat-panel{width:380px;min-width:220px;max-width:70%;flex-shrink:0;display:flex;flex-direction:column;background:var(--bg2);position:relative;z-index:2;overflow:hidden}
 
-.resizer { width: 8px; flex-shrink: 0; background: var(--border); cursor: col-resize; position: relative; z-index: 5; transition: background 0.15s; display: flex; align-items: center; justify-content: center; }
-.resizer:hover, .resizer.dragging { background: rgba(59,130,246,0.5); }
-.resizer-dots { display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
-.resizer-dots span { display: block; width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.25); }
-.resizer:hover .resizer-dots span, .resizer.dragging .resizer-dots span { background: rgba(255,255,255,0.6); }
+.resizer{width:8px;flex-shrink:0;background:var(--border);cursor:col-resize;position:relative;z-index:5;transition:background .15s;display:flex;align-items:center;justify-content:center}
+.resizer:hover,.resizer.dragging{background:rgba(59,130,246,.6)}
+.resizer-dots{display:flex;flex-direction:column;gap:4px;pointer-events:none}
+.resizer-dots span{display:block;width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.2)}
+.resizer:hover .resizer-dots span,.resizer.dragging .resizer-dots span{background:rgba(255,255,255,.7)}
 
-.dash-panel { flex: 1; min-width: 220px; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; background-image: radial-gradient(ellipse at 70% 0%, rgba(59,130,246,0.06) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px); background-size: 100% 100%, 44px 44px, 44px 44px; }
+.dash-panel{flex:1;min-width:220px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;background-image:radial-gradient(ellipse at 70% 0%,rgba(59,130,246,.06) 0%,transparent 60%),linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:100% 100%,44px 44px,44px 44px}
 
-.panel-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: rgba(8,12,24,0.5); }
-.panel-label { font-size: 10px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; }
+.panel-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(8,12,24,.5)}
+.panel-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.1em}
 
-.upload-zone { margin: 14px 16px; border: 1.5px dashed rgba(255,255,255,0.1); border-radius: 10px; padding: 16px 14px; text-align: center; cursor: pointer; transition: all 0.25s; background: rgba(255,255,255,0.02); flex-shrink: 0; }
-.upload-zone:hover, .upload-zone.drag-over { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.06); }
-.upload-zone.has-file { border-color: rgba(16,185,129,0.45); background: rgba(16,185,129,0.06); }
-.upload-icon-wrap { width: 34px; height: 34px; border-radius: 9px; background: var(--bg4); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-size: 15px; }
-.upload-title { font-size: 13px; font-weight: 600; color: var(--t1); margin-bottom: 3px; }
-.upload-sub { font-size: 11px; color: var(--t3); line-height: 1.5; }
-.upload-sub strong { color: var(--accent2); font-weight: 500; }
-.upload-file-name { font-size: 11px; color: var(--green2); font-weight: 500; font-family: 'DM Mono', monospace; margin-top: 6px; }
+.upload-zone{margin:14px 16px;border:1.5px dashed rgba(255,255,255,.1);border-radius:10px;padding:16px 14px;text-align:center;cursor:pointer;transition:all .25s;background:rgba(255,255,255,.02);flex-shrink:0}
+.upload-zone:hover,.upload-zone.drag-over{border-color:rgba(59,130,246,.5);background:rgba(59,130,246,.06)}
+.upload-zone.has-file{border-color:rgba(16,185,129,.45);background:rgba(16,185,129,.06)}
+.upload-icon-wrap{width:34px;height:34px;border-radius:9px;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:15px}
+.upload-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:3px}
+.upload-sub{font-size:11px;color:var(--t3);line-height:1.5}
+.upload-sub strong{color:var(--accent2);font-weight:500}
+.upload-file-name{font-size:11px;color:var(--green2);font-weight:500;font-family:'DM Mono',monospace;margin-top:6px}
 
-.messages { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin; scrollbar-color: var(--bg5) transparent; }
-.messages::-webkit-scrollbar { width: 3px; }
-.messages::-webkit-scrollbar-thumb { background: var(--bg5); border-radius: 2px; }
-.msg-user { background: var(--bg5); border: 1px solid var(--border2); border-radius: 12px 12px 3px 12px; padding: 9px 13px; font-size: 13px; align-self: flex-end; max-width: 88%; line-height: 1.55; }
-.msg-ai { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.18); border-left: 2px solid var(--accent); border-radius: 3px 12px 12px 12px; padding: 10px 13px; font-size: 13px; line-height: 1.65; max-width: 96%; }
-.msg-ai b { color: var(--accent2); font-weight: 600; }
-.msg-progress { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; font-size: 11px; color: var(--t2); font-family: 'DM Mono', monospace; }
-.pulse-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex-shrink: 0; animation: pulse 1.4s infinite; }
-@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.75)} }
-.msg-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 8px; padding: 9px 13px; font-size: 12px; color: #FCA5A5; }
+.messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--bg5) transparent}
+.messages::-webkit-scrollbar{width:3px}
+.messages::-webkit-scrollbar-thumb{background:var(--bg5);border-radius:2px}
+.msg-user{background:var(--bg5);border:1px solid var(--border2);border-radius:12px 12px 3px 12px;padding:9px 13px;font-size:13px;align-self:flex-end;max-width:88%;line-height:1.55}
+.msg-ai{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.18);border-left:2px solid var(--accent);border-radius:3px 12px 12px 12px;padding:10px 13px;font-size:13px;line-height:1.65;max-width:96%}
+.msg-ai b{color:var(--accent2);font-weight:600}
+.msg-progress{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--t2);font-family:'DM Mono',monospace}
+.pulse-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex-shrink:0;animation:pulse 1.4s infinite}
+.msg-error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:9px 13px;font-size:12px;color:#FCA5A5}
 
-.input-area { padding: 12px 16px 14px; border-top: 1px solid var(--border); flex-shrink: 0; background: rgba(8,12,24,0.4); }
-.input-wrap { display: flex; align-items: flex-end; gap: 8px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 12px; transition: border-color 0.2s, box-shadow 0.2s; }
-.input-wrap:focus-within { border-color: rgba(59,130,246,0.5); box-shadow: 0 0 0 3px rgba(59,130,246,0.08); }
-.input-wrap textarea { flex: 1; background: transparent; border: none; outline: none; font-size: 13px; color: var(--t1); font-family: 'DM Sans', sans-serif; resize: none; min-height: 20px; max-height: 100px; line-height: 1.5; }
-.input-wrap textarea::placeholder { color: var(--t4); }
-.send-btn { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--purple)); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; box-shadow: 0 2px 10px rgba(59,130,246,0.3); }
-.send-btn:hover { transform: translateY(-1px); }
-.send-btn:disabled { background: var(--bg5); cursor: not-allowed; transform: none; box-shadow: none; }
-.input-hint { font-size: 10px; color: var(--t4); margin-top: 8px; text-align: center; }
+.input-area{padding:12px 16px 14px;border-top:1px solid var(--border);flex-shrink:0;background:rgba(8,12,24,.4)}
+.input-wrap{display:flex;align-items:flex-end;gap:8px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;transition:border-color .2s,box-shadow .2s}
+.input-wrap:focus-within{border-color:rgba(59,130,246,.5);box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+.input-wrap textarea{flex:1;background:transparent;border:none;outline:none;font-size:13px;color:var(--t1);font-family:'DM Sans',sans-serif;resize:none;min-height:20px;max-height:100px;line-height:1.5}
+.input-wrap textarea::placeholder{color:var(--t4)}
+.send-btn{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--purple));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 2px 10px rgba(59,130,246,.3)}
+.send-btn:hover{transform:translateY(-1px)}
+.send-btn:disabled{background:var(--bg5);cursor:not-allowed;transform:none;box-shadow:none}
+.input-hint{font-size:10px;color:var(--t4);margin-top:8px;text-align:center}
 
-.dash-header { padding: 14px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; background: rgba(8,12,24,0.7); }
-.dash-live { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--green2); }
-.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); animation: pulse 1.4s infinite; }
-.dash-content { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; scrollbar-width: thin; scrollbar-color: var(--bg4) transparent; }
-.dash-content::-webkit-scrollbar { width: 3px; }
-.dash-content::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 2px; }
+.dash-header{padding:14px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:rgba(8,12,24,.7)}
+.dash-live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--green2)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 1.4s infinite}
+.dash-content{flex:1;overflow-y:auto;padding:20px 22px;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin;scrollbar-color:var(--bg4) transparent}
+.dash-content::-webkit-scrollbar{width:3px}
+.dash-content::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
 
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-.kpi-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px; transition: all 0.2s; position: relative; overflow: hidden; }
-.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), var(--purple)); opacity: 0; transition: opacity 0.2s; }
-.kpi-card:hover { border-color: var(--border2); transform: translateY(-1px); }
-.kpi-card:hover::before { opacity: 1; }
-.kpi-label { font-size: 10px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
-.kpi-value { font-size: 26px; font-weight: 600; color: var(--t1); letter-spacing: -1px; line-height: 1; margin-bottom: 8px; font-family: 'DM Mono', monospace; }
-.kpi-delta { font-size: 11px; font-weight: 500; }
-.kpi-delta.up { color: var(--green2); }
-.kpi-delta.down { color: #FCA5A5; }
-.kpi-delta.neutral { color: var(--t3); }
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;transition:all .2s;position:relative;overflow:hidden;animation:fadeUp .35s ease both}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--purple));opacity:0;transition:opacity .2s}
+.kpi-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.kpi-card:hover::before{opacity:1}
+.kpi-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+.kpi-value{font-size:24px;font-weight:600;color:var(--t1);letter-spacing:-1px;line-height:1;margin-bottom:8px;font-family:'DM Mono',monospace}
+.kpi-delta{font-size:11px;font-weight:500}
+.kpi-delta.up{color:var(--green2)}
+.kpi-delta.down{color:#FCA5A5}
+.kpi-delta.neutral{color:var(--t3)}
 
-.chart-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-.chart-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
-.chart-title { font-size: 14px; font-weight: 600; color: var(--t1); letter-spacing: -0.2px; }
-.chart-sub { font-size: 11px; color: var(--t3); margin-top: 3px; font-family: 'DM Mono', monospace; }
-.chart-badge { font-size: 10px; padding: 3px 9px; border-radius: 20px; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: var(--accent2); font-weight: 500; }
-.chart-wrapper { position: relative; height: 220px; }
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;animation:fadeUp .35s ease .1s both}
+.chart-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.chart-title{font-size:14px;font-weight:600;color:var(--t1);letter-spacing:-.2px}
+.chart-sub{font-size:11px;color:var(--t3);margin-top:3px;font-family:'DM Mono',monospace}
+.chart-badge{font-size:10px;padding:3px 9px;border-radius:20px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);color:var(--accent2);font-weight:500}
+.chart-wrapper{position:relative;height:220px}
 
-.progress-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
-.progress-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.progress-title { font-size: 12px; font-weight: 500; color: var(--t2); display: flex; align-items: center; gap: 8px; }
-.progress-count { font-size: 11px; color: var(--t3); font-family: 'DM Mono', monospace; }
-.progress-track { height: 3px; background: var(--bg5); border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 2px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 0 8px rgba(59,130,246,0.5); }
-.progress-msg { font-size: 10px; color: var(--t3); font-family: 'DM Mono', monospace; }
+.progress-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+.progress-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.progress-title{font-size:12px;font-weight:500;color:var(--t2);display:flex;align-items:center;gap:8px}
+.progress-count{font-size:11px;color:var(--t3);font-family:'DM Mono',monospace}
+.progress-track{height:3px;background:var(--bg5);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1);box-shadow:0 0 8px rgba(59,130,246,.5)}
+.progress-msg{font-size:10px;color:var(--t3);font-family:'DM Mono',monospace}
 
-.summary-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-.summary-header { font-size: 10px; font-weight: 600; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-.summary-header::before { content: ''; width: 3px; height: 13px; background: linear-gradient(180deg, var(--accent), var(--purple)); border-radius: 2px; }
-.summary-text { font-size: 13px; color: var(--t2); line-height: 1.75; white-space: pre-wrap; }
+.summary-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;animation:fadeUp .35s ease .2s both}
+.summary-header{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.summary-header::before{content:'';width:3px;height:13px;background:linear-gradient(180deg,var(--accent),var(--purple));border-radius:2px}
+.summary-text{font-size:13px;color:var(--t2);line-height:1.75;white-space:pre-wrap}
 
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 60px 40px; }
-.empty-icon { width: 60px; height: 60px; border-radius: 18px; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15)); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 26px; }
-.empty-title { font-size: 16px; font-weight: 600; color: var(--t2); }
-.empty-sub { font-size: 13px; color: var(--t3); max-width: 300px; line-height: 1.65; }
-
-@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-.kpi-card { animation: fadeUp 0.35s ease both; }
-.chart-card { animation: fadeUp 0.35s ease 0.1s both; }
-.summary-card { animation: fadeUp 0.35s ease 0.2s both; }
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:60px 40px}
+.empty-icon{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(139,92,246,.15));border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;font-size:26px}
+.empty-title{font-size:16px;font-weight:600;color:var(--t2)}
+.empty-sub{font-size:13px;color:var(--t3);max-width:300px;line-height:1.65}
 </style>
 </head>
 <body>
@@ -145,10 +130,7 @@ body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2
     <div class="logo-name">Analytics <span>Engine</span></div>
   </div>
   <div class="header-right">
-    <div class="status-row">
-      <div class="status-dot"></div>
-      <span id="headerStatus">Готов</span>
-    </div>
+    <div class="status-row"><div class="status-dot"></div><span id="headerStatus">Готов</span></div>
     <div class="pill active">Э1 · CSV Analyst</div>
   </div>
 </div>
@@ -181,12 +163,10 @@ body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2
   </div>
 
   <div class="resizer" id="resizer">
-    <div class="resizer-dots">
-      <span></span><span></span><span></span><span></span><span></span>
-    </div>
+    <div class="resizer-dots"><span></span><span></span><span></span><span></span><span></span></div>
   </div>
 
-  <div class="dash-panel" id="dashPanel">
+  <div class="dash-panel">
     <div class="dash-header">
       <div class="panel-label">Дашборд — обновляется в реальном времени</div>
       <div class="dash-live" id="dashLive" style="display:none">
@@ -206,36 +186,24 @@ body::after { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 2
 
 <script>
 const WORKER_URL = "https://sg-analytics-engine.dorofeevov17.workers.dev";
-const MAX_ITERATIONS = 10;
+const MAX_ITER   = 10;
 let csvContent = null, isAnalyzing = false, currentChart = null, progressInited = false;
 
 // ── RESIZER ───────────────────────────────────────────────────────────────────
-const resizer   = document.getElementById("resizer");
+const resizerEl = document.getElementById("resizer");
 const chatPanel = document.getElementById("chatPanel");
-
-resizer.addEventListener("mousedown", e => {
+resizerEl.addEventListener("mousedown", e => {
   e.preventDefault();
-  resizer.classList.add("dragging");
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  const startX = e.clientX;
-  const startW = chatPanel.offsetWidth;
-  function onMove(e) {
-    const w = Math.max(220, Math.min(startW + e.clientX - startX, window.innerWidth * 0.75));
-    chatPanel.style.width = w + "px";
-  }
-  function onUp() {
-    resizer.classList.remove("dragging");
-    document.body.style.cursor = "";
-    document.body.style.userSelect = "";
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-  }
+  resizerEl.classList.add("dragging");
+  document.body.style.cssText += ";cursor:col-resize!important;user-select:none!important";
+  const startX = e.clientX, startW = chatPanel.offsetWidth;
+  const onMove = e => { chatPanel.style.width = Math.max(220, Math.min(startW + e.clientX - startX, window.innerWidth * .75)) + "px"; };
+  const onUp   = () => { resizerEl.classList.remove("dragging"); document.body.style.cursor=""; document.body.style.userSelect=""; document.removeEventListener("mousemove",onMove); document.removeEventListener("mouseup",onUp); };
   document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
+  document.addEventListener("mouseup",   onUp);
 });
 
-// ── FILE UPLOAD ───────────────────────────────────────────────────────────────
+// ── REFS ──────────────────────────────────────────────────────────────────────
 const uploadZone     = document.getElementById("uploadZone");
 const fileInput      = document.getElementById("fileInput");
 const uploadFilename = document.getElementById("uploadFilename");
@@ -247,6 +215,7 @@ const dashLive       = document.getElementById("dashLive");
 const dashLiveText   = document.getElementById("dashLiveText");
 const headerStatus   = document.getElementById("headerStatus");
 
+// ── FILE ──────────────────────────────────────────────────────────────────────
 uploadZone.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", e => handleFile(e.target.files[0]));
 uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
@@ -264,214 +233,234 @@ function handleFile(file) {
     uploadZone.querySelector(".upload-sub").innerHTML = file.name + " · " + (file.size/1024).toFixed(1) + " KB";
     sendBtn.disabled = false;
     chatInput.placeholder = "Что хочешь узнать из этих данных?";
-    addMsg("ai", "**" + file.name + "** загружен · строк: ~" + (csvContent.split('\n').length - 1) + "\nЗадай вопрос.");
+    addMsg("ai", "**" + file.name + "** загружен · строк: ~" + (csvContent.split('\n').length-1) + "\nЗадай вопрос.");
   };
   reader.readAsText(file);
 }
 
 // ── INPUT ─────────────────────────────────────────────────────────────────────
-chatInput.addEventListener("keydown", e => { if (e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); sendMessage(); } });
+chatInput.addEventListener("keydown", e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();} });
 chatInput.addEventListener("input", () => { chatInput.style.height="auto"; chatInput.style.height=Math.min(chatInput.scrollHeight,100)+"px"; });
 sendBtn.addEventListener("click", sendMessage);
-
 function sendMessage() {
   const q = chatInput.value.trim();
-  if (!q || !csvContent || isAnalyzing) return;
-  chatInput.value = ""; chatInput.style.height = "auto";
+  if (!q||!csvContent||isAnalyzing) return;
+  chatInput.value=""; chatInput.style.height="auto";
   startAnalysis(q);
 }
 
 // ── MESSAGES ──────────────────────────────────────────────────────────────────
 function addMsg(type, text) {
-  const div = document.createElement("div");
-  if      (type==="user") { div.className="msg-user"; div.textContent=text; }
-  else if (type==="ai")   { div.className="msg-ai"; div.innerHTML=fmt(text); }
-  else if (type==="prog") { div.className="msg-progress"; div.innerHTML='<div class="pulse-dot"></div><span>'+text+'</span>'; div.id="progressMsg"; }
-  else if (type==="err")  { div.className="msg-error"; div.textContent=text; }
-  messages.appendChild(div);
-  div.scrollIntoView({behavior:"smooth",block:"start"});
-  return div;
+  const d = document.createElement("div");
+  if      (type==="user") { d.className="msg-user"; d.textContent=text; }
+  else if (type==="ai")   { d.className="msg-ai"; d.innerHTML=fmt(text); }
+  else if (type==="prog") { d.className="msg-progress"; d.innerHTML='<div class="pulse-dot"></div><span>'+text+'</span>'; d.id="progressMsg"; }
+  else if (type==="err")  { d.className="msg-error"; d.textContent=text; }
+  messages.appendChild(d);
+  d.scrollIntoView({behavior:"smooth",block:"start"});
+  return d;
 }
-function updProg(t) { const el=document.getElementById("progressMsg"); if(el) el.querySelector("span").textContent=t; }
-function delProg()  { const el=document.getElementById("progressMsg"); if(el) el.remove(); }
+function updProg(t) { const e=document.getElementById("progressMsg"); if(e) e.querySelector("span").textContent=t; }
+function delProg()  { const e=document.getElementById("progressMsg"); if(e) e.remove(); }
 function fmt(t)     { return t.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>"); }
 
 // ── PROGRESS DASHBOARD ────────────────────────────────────────────────────────
 function initProgress(total) {
   progressInited = true;
-  dashContent.innerHTML = `
-    <div class="progress-card">
-      <div class="progress-row">
-        <div class="progress-title"><div class="pulse-dot"></div><span id="progMsg">Инициализация...</span></div>
-        <div class="progress-count" id="progCount">0 / ${total}</div>
-      </div>
-      <div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>
-      <div class="progress-msg" id="progSub">Python · Judge0 CE · итерационный анализ · 0%</div>
-    </div>
-    <div class="empty-state">
-      <div class="empty-icon">⚙️</div>
-      <div class="empty-title">Строю анализ</div>
-      <div class="empty-sub">Агент пишет Python, выполняет и итерирует.<br>Метрики появятся здесь.</div>
-    </div>`;
+  dashContent.innerHTML =
+    '<div class="progress-card">' +
+      '<div class="progress-row"><div class="progress-title"><div class="pulse-dot"></div><span id="progMsg">Инициализация...</span></div><div class="progress-count" id="progCount">0 / '+total+'</div></div>' +
+      '<div class="progress-track"><div class="progress-fill" id="progFill" style="width:0%"></div></div>' +
+      '<div class="progress-msg" id="progSub">Python · Judge0 CE · итерационный анализ · 0%</div>' +
+    '</div>' +
+    '<div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-title">Строю анализ</div><div class="empty-sub">Агент пишет Python, выполняет и итерирует.<br>Метрики появятся здесь.</div></div>';
 }
-
-function updateProgress(iter, total, message) {
+function updateProgress(iter, total, msg) {
   if (!progressInited) initProgress(total);
   const pct = total>0 ? Math.round(iter/total*100) : 0;
-  const msg  = document.getElementById("progMsg");
-  const cnt  = document.getElementById("progCount");
-  const fill = document.getElementById("progFill");
-  const sub  = document.getElementById("progSub");
-  if (msg)  msg.textContent  = message || "Анализирую...";
-  if (cnt)  cnt.textContent  = iter + " / " + total;
-  if (fill) fill.style.width = pct + "%";
-  if (sub)  sub.textContent  = "Python · Judge0 CE · итерационный анализ · " + pct + "%";
+  const em=document.getElementById("progMsg"), ec=document.getElementById("progCount"), ef=document.getElementById("progFill"), es=document.getElementById("progSub");
+  if(em) em.textContent = msg||"Анализирую...";
+  if(ec) ec.textContent = iter+" / "+total;
+  if(ef) ef.style.width = pct+"%";
+  if(es) es.textContent = "Python · Judge0 CE · итерационный анализ · "+pct+"%";
 }
 
 // ── ANALYSIS ──────────────────────────────────────────────────────────────────
 async function startAnalysis(question) {
-  isAnalyzing = true; sendBtn.disabled = true; progressInited = false;
-  headerStatus.textContent = "Анализирую...";
-  dashLive.style.display = "flex";
-  dashLiveText.textContent = "Запуск...";
+  isAnalyzing=true; sendBtn.disabled=true; progressInited=false;
+  headerStatus.textContent="Анализирую...";
+  dashLive.style.display="flex"; dashLiveText.textContent="Запуск...";
   addMsg("user", question);
   addMsg("prog", "Запускаю анализ...");
-  initProgress(MAX_ITERATIONS);
+  initProgress(MAX_ITER);
 
   let sessionId;
   try {
-    const r = await fetch(WORKER_URL + "/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, csvContent, userId: "demo", maxIterations: MAX_ITERATIONS, language: "ru" }),
+    const r = await fetch(WORKER_URL+"/analyze", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question, csvContent, userId:"demo", maxIterations:MAX_ITER, language:"ru"})
     });
     sessionId = (await r.json()).sessionId;
   } catch(e) { delProg(); addMsg("err","Не удалось подключиться: "+e.message); reset(); return; }
 
-  let attempts = 0;
+  let attempts=0, done=false;
   const poll = setInterval(async () => {
+    if (done) return;
     if (++attempts > 300) { clearInterval(poll); delProg(); addMsg("err","Таймаут. Попробуй снова."); reset(); return; }
     try {
-      const data = await (await fetch(WORKER_URL + "/result/" + sessionId)).json();
+      const resp = await fetch(WORKER_URL+"/result/"+sessionId);
+      const data = await resp.json();
 
-      if (data.status === "running") {
-        const iter  = data.iteration || 0;
-        const total = data.maxIterations || MAX_ITERATIONS;
-        const msg   = data.progressMessage || "Анализирую...";
-        updProg(msg + " (" + iter + "/" + total + ")");
+      if (data.status==="running") {
+        const iter=data.iteration||0, total=data.maxIterations||MAX_ITER, msg=data.progressMessage||"Анализирую...";
+        updProg(msg+" ("+iter+"/"+total+")");
         updateProgress(iter, total, msg);
-        dashLiveText.textContent = "Итерация " + iter + " / " + total;
+        dashLiveText.textContent="Итерация "+iter+" / "+total;
       }
 
-      if (data.status === "completed") {
-        clearInterval(poll);
-        delProg();
-        const summary = (data.result && data.result.summary) ? data.result.summary : (data.summaries || []).join(" ") || "Анализ завершён.";
+      if (data.status==="completed") {
+        done=true; clearInterval(poll); delProg();
+        const summary = data.result?.summary || (data.summaries||[]).join(" ") || "Анализ завершён.";
         addMsg("ai", summary);
         showResults(data);
-        dashLive.style.display = "none";
-        headerStatus.textContent = "Готов";
+        dashLive.style.display="none";
+        headerStatus.textContent="Готов";
         reset();
       }
 
-      if (data.status === "error") {
-        clearInterval(poll); delProg();
-        addMsg("err", "Ошибка: " + (data.error || "неизвестная ошибка"));
-        dashLive.style.display = "none";
-        reset();
+      if (data.status==="error") {
+        done=true; clearInterval(poll); delProg();
+        addMsg("err","Ошибка: "+(data.error||"неизвестная ошибка"));
+        dashLive.style.display="none"; reset();
       }
-    } catch(e) { console.warn("poll:", e); }
+    } catch(e) { console.warn("poll:",e); }
   }, 2000);
 }
 
-function reset() { isAnalyzing = false; sendBtn.disabled = !csvContent; }
+function reset() { isAnalyzing=false; sendBtn.disabled=!csvContent; }
 
-// ── RESULTS ───────────────────────────────────────────────────────────────────
+// ── SHOW RESULTS ──────────────────────────────────────────────────────────────
 function showResults(data) {
-  if (currentChart) { currentChart.destroy(); currentChart = null; }
+  if (currentChart) { currentChart.destroy(); currentChart=null; }
 
-  const summary    = (data.result && data.result.summary) ? data.result.summary : "";
-  const iterCount  = data.iteration || 0;
-  const outputs    = data.outputs || [];
+  const summary   = data.result?.summary || "";
+  const outputs   = data.outputs || [];
+  const iterCount = data.iteration || 0;
 
-  // Используем charts из result если есть — они уже готовы
-  const resultCharts  = (data.result && data.result.charts)  ? data.result.charts  : [];
-  const resultMetrics = (data.result && data.result.metrics) ? data.result.metrics : [];
+  // Парсим outputs — Python может вернуть одинарные кавычки вместо двойных
+  const parsed = outputs.map(raw => {
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch {}
+    // Python dict → JSON: одинарные кавычки → двойные, True/False/None
+    try {
+      const fixed = raw
+        .replace(/'/g, '"')
+        .replace(/\bTrue\b/g, "true")
+        .replace(/\bFalse\b/g, "false")
+        .replace(/\bNone\b/g, "null");
+      return JSON.parse(fixed);
+    } catch {}
+    return null;
+  }).filter(Boolean);
 
-  const metrics   = resultMetrics.length > 0 ? resultMetrics : extractMetrics(outputs);
-  const chartData = resultCharts.length  > 0 ? parseResultChart(resultCharts[0]) : extractChartData(outputs);
+  const chartData = buildChartData(parsed);
+  const metrics   = buildMetrics(parsed);
 
   let html = "";
 
   if (metrics.length > 0) {
     html += '<div class="kpi-grid">';
     metrics.slice(0,4).forEach(m => {
-      html += '<div class="kpi-card"><div class="kpi-label">' + (m.label||m.name||"Метрика") + '</div><div class="kpi-value">' + (m.value||"-") + '</div>' + (m.delta ? '<div class="kpi-delta '+(m.cls||"neutral")+'">' + m.delta + '</div>' : '') + '</div>';
+      html += '<div class="kpi-card"><div class="kpi-label">'+m.label+'</div><div class="kpi-value">'+m.value+'</div>'+(m.delta?'<div class="kpi-delta '+m.cls+'">'+m.delta+'</div>':'')+'</div>';
     });
     html += '</div>';
   }
 
-  if (chartData && chartData.labels && chartData.labels.length > 0) {
-    html += '<div class="chart-card"><div class="chart-header"><div><div class="chart-title">Результаты анализа</div><div class="chart-sub">' + iterCount + ' итераций · Judge0 CE</div></div><div class="chart-badge">Завершён</div></div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>';
+  if (chartData) {
+    html += '<div class="chart-card"><div class="chart-header"><div><div class="chart-title">Динамика по категориям</div><div class="chart-sub">'+iterCount+' итераций · Judge0 CE</div></div><div class="chart-badge">Завершён</div></div><div class="chart-wrapper"><canvas id="mainChart"></canvas></div></div>';
   }
 
-  html += '<div class="summary-card"><div class="summary-header">Итоги анализа</div><div class="summary-text" id="summaryText"></div></div>';
+  html += '<div class="summary-card"><div class="summary-header">Итоги анализа</div><div class="summary-text" id="sumText"></div></div>';
 
   dashContent.innerHTML = html;
-  const st = document.getElementById("summaryText");
+  const st = document.getElementById("sumText");
   if (st) st.innerHTML = fmt(summary);
 
-  if (chartData && chartData.labels && chartData.labels.length > 0) {
+  if (chartData) {
     const ctx = document.getElementById("mainChart");
     if (ctx) {
-      const colors = ["rgba(59,130,246,0.75)","rgba(16,185,129,0.75)","rgba(139,92,246,0.75)","rgba(245,158,11,0.75)","rgba(239,68,68,0.75)","rgba(20,184,166,0.75)"];
-      const borders= ["rgba(59,130,246,1)","rgba(16,185,129,1)","rgba(139,92,246,1)","rgba(245,158,11,1)","rgba(239,68,68,1)","rgba(20,184,166,1)"];
+      const bg  = ["rgba(59,130,246,.75)","rgba(16,185,129,.75)","rgba(139,92,246,.75)","rgba(245,158,11,.75)","rgba(239,68,68,.75)","rgba(20,184,166,.75)"];
+      const brd = ["rgba(59,130,246,1)","rgba(16,185,129,1)","rgba(139,92,246,1)","rgba(245,158,11,1)","rgba(239,68,68,1)","rgba(20,184,166,1)"];
+      // Раскрашиваем: положительные — зелёный, отрицательные — красный
+      const barBg  = chartData.values.map(v => v>=0 ? "rgba(16,185,129,.75)" : "rgba(239,68,68,.75)");
+      const barBrd = chartData.values.map(v => v>=0 ? "rgba(16,185,129,1)"   : "rgba(239,68,68,1)");
       currentChart = new Chart(ctx.getContext("2d"), {
-        type: "bar",
-        data: {
-          labels: chartData.labels,
-          datasets: [{ data: chartData.values, backgroundColor: colors.slice(0,chartData.labels.length), borderColor: borders.slice(0,chartData.labels.length), borderWidth:1, borderRadius:6 }]
-        },
-        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:"rgba(255,255,255,0.04)"},ticks:{color:"#64748B",font:{family:"'DM Mono'",size:11}}}, x:{grid:{display:false},ticks:{color:"#64748B",font:{size:12}}} } }
+        type:"bar",
+        data:{ labels:chartData.labels, datasets:[{data:chartData.values, backgroundColor:barBg, borderColor:barBrd, borderWidth:1, borderRadius:6}] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+          scales:{ y:{beginAtZero:false,grid:{color:"rgba(255,255,255,.04)"},ticks:{color:"#64748B",font:{family:"'DM Mono'",size:11}}}, x:{grid:{display:false},ticks:{color:"#64748B",font:{size:12}}} } }
       });
     }
   }
 }
 
-// Парсит chart из формата result.charts (который генерирует output.ts)
-function parseResultChart(chart) {
-  if (!chart) return null;
-  // Формат: {type, title, labels, datasets:[{label, data, color}]}
-  if (chart.labels && chart.datasets && chart.datasets[0]) {
-    return { labels: chart.labels, values: chart.datasets[0].data };
+// ── DATA EXTRACTION ───────────────────────────────────────────────────────────
+// Ищем объект вида {CategoryName: number, ...} — это и есть наши данные
+function buildChartData(parsed) {
+  for (const obj of parsed) {
+    const result = obj?.result;
+    if (!result || typeof result !== "object" || Array.isArray(result)) continue;
+    const entries = Object.entries(result).filter(([,v]) => typeof v === "number");
+    if (entries.length >= 2) {
+      return { labels: entries.map(([k])=>k), values: entries.map(([,v])=>v) };
+    }
+  }
+  // fallback — ищем любой объект с числовыми значениями
+  for (const obj of parsed) {
+    function findNumObj(o) {
+      if (!o||typeof o!=="object"||Array.isArray(o)) return null;
+      const entries = Object.entries(o).filter(([,v])=>typeof v==="number");
+      if (entries.length>=2) return { labels:entries.map(([k])=>k), values:entries.map(([,v])=>v) };
+      for (const v of Object.values(o)) { const r=findNumObj(v); if(r) return r; }
+      return null;
+    }
+    const r = findNumObj(obj);
+    if (r) return r;
   }
   return null;
 }
 
-// Fallback — извлекаем из сырых outputs
-function extractMetrics(outputs) {
+function buildMetrics(parsed) {
   const out=[], seen=new Set();
-  const kw=["revenue","sales","profit","units","orders","count","total","avg","sum","amount","margin","rate","pct","growth"];
-  const lm={total_revenue:"Выручка",revenue:"Выручка",total_sales:"Продажи",units:"Единиц",orders:"Заказов",profit:"Прибыль",margin:"Маржа",count:"Кол-во"};
-  function isM(k){ return kw.some(w=>k.toLowerCase().includes(w)); }
-  function fv(k,v){ const kl=k.toLowerCase(); if(kl.includes("pct")||kl.includes("rate")||kl.includes("margin")) return (typeof v==="number"?v.toFixed(1):v)+"%"; return fmtN(v); }
-  function scan(obj){ if(!obj||typeof obj!=="object") return; for(const [k,v] of Object.entries(obj)){ if(seen.has(k)) continue; if(typeof v==="number"&&isFinite(v)&&isM(k)){ seen.add(k); out.push({label:lm[k]||k.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),value:fv(k,v),delta:null,cls:"neutral"}); } if(out.length>=4) return; } for(const v of Object.values(obj)){ if(v&&typeof v==="object"&&!Array.isArray(v)&&out.length<4) scan(v); } }
-  for(const raw of outputs){ if(out.length>=4) break; try{ scan(typeof raw==="string"?JSON.parse(raw):raw); }catch{} }
+  const kw=["total","revenue","sales","profit","units","count","avg","sum","margin","rate","pct","growth"];
+  for (const obj of parsed) {
+    function scan(o) {
+      if (!o||typeof o!=="object") return;
+      for (const [k,v] of Object.entries(o)) {
+        if (seen.has(k)) continue;
+        if (typeof v==="number"&&isFinite(v)&&kw.some(w=>k.toLowerCase().includes(w))) {
+          seen.add(k);
+          const kl=k.toLowerCase();
+          const isP=kl.includes("pct")||kl.includes("rate")||kl.includes("margin")||kl.includes("growth");
+          out.push({ label:k.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()), value:isP?(v.toFixed(1)+"%"):fmtN(v), delta:null, cls:"neutral" });
+        }
+        if (out.length>=4) return;
+      }
+      for (const v of Object.values(o)) { if(v&&typeof v==="object"&&!Array.isArray(v)&&out.length<4) scan(v); }
+    }
+    scan(obj);
+    if (out.length>=4) break;
+  }
   return out;
 }
 
-function extractChartData(outputs) {
-  for(const raw of outputs){
-    try{
-      const d=typeof raw==="string"?JSON.parse(raw):raw;
-      function fa(o){ if(!o||typeof o!=="object") return null; if(Array.isArray(o)&&o.length>0&&typeof o[0]==="object"){ const ks=Object.keys(o[0]); if(ks.length>=2){ const lk=ks.find(k=>typeof o[0][k]==="string")||ks[0]; const vk=ks.find(k=>typeof o[0][k]==="number")||ks[1]; if(typeof o[0][vk]==="number") return{labels:o.map(r=>String(r[lk])),values:o.map(r=>Number(r[vk])||0)}; } } for(const v of Object.values(o)){ if(Array.isArray(v)&&v.length>0){const r=fa(v);if(r) return r;} } return null; }
-      const f=fa(d); if(f&&f.labels.length>0) return f;
-    }catch{}
-  }
-  return null;
+function fmtN(n) {
+  if (typeof n!=="number") return String(n);
+  if (n>=1e6)  return "$"+(n/1e6).toFixed(1)+"M";
+  if (n>=1000) return "$"+Number(n).toLocaleString();
+  if (n%1!==0) return n.toFixed(2);
+  return String(n);
 }
-
-function fmtN(n){ if(typeof n!=="number") return String(n); if(n>=1000000) return "$"+(n/1e6).toFixed(1)+"M"; if(n>=1000) return "$"+Number(n).toLocaleString(); if(n%1!==0) return n.toFixed(2); return String(n); }
 </script>
 </body>
 </html>
