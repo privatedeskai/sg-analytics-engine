@@ -68,6 +68,22 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
   throw new Error('All Gonka nodes failed. Last error: ' + lastError);
 }
 
+function fixJsonString(raw: string): string {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) { result += ch; escaped = false; continue; }
+    if (ch === '\\') { escaped = true; result += ch; continue; }
+    if (ch === '"') { inString = !inString; result += ch; continue; }
+    if (inString && ch === '\n') { result += '\\n'; continue; }
+    if (inString && ch === '\r') { continue; }
+    result += ch;
+  }
+  return result;
+}
+
 export class KimiClient {
   constructor(private key: string, private address: string) {}
 
@@ -98,39 +114,20 @@ export class KimiClient {
 
   private parse(raw: string, i: number): IterationResult {
     try {
-      const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
-      const p = JSON.parse(clean);
+      const stripped = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+      const fixed = fixJsonString(stripped);
+      const p = JSON.parse(fixed);
       if (p && typeof p === 'object' && p.python) {
         console.log('[LLM] parse ok iter=' + i);
         return {
-          python: this.extractCode(p.python || ''),
+          python: p.python,
           summary: (p.summary || '').slice(0, 200),
           enough: Boolean(p.enough),
           reason: (p.reason || '').slice(0, 100),
         };
       }
     } catch (_) {}
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*"python"[\s\S]*\}/);
-      if (jsonMatch) {
-        const p = JSON.parse(jsonMatch[0]);
-        if (p && p.python) {
-          console.log('[LLM] parse json-extract iter=' + i);
-          return {
-            python: this.extractCode(p.python || ''),
-            summary: (p.summary || '').slice(0, 200),
-            enough: Boolean(p.enough),
-            reason: (p.reason || '').slice(0, 100),
-          };
-        }
-      }
-    } catch (_) {}
     console.log('[LLM] parse failed iter=' + i + ' raw=' + raw.slice(0, 150));
     return { python: '', summary: 'parse failed iter ' + i, enough: false, reason: 'parse failed' };
-  }
-
-  private extractCode(t: string): string {
-    const m = t.match(/```(?:python)?\n?([\s\S]*?)```/);
-    return m ? m[1].trim() : t.trim();
   }
 }
