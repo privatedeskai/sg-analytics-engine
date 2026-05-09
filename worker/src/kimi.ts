@@ -88,11 +88,11 @@ export class KimiClient {
   constructor(private key: string, private address: string) {}
 
   async generateIteration(dd: string, q: string, sums: string[], i: number, max: number): Promise<IterationResult> {
-    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
+    const sp = 'Python analyst. CSV in CSV_DATA (string). Write SHORT python (max 5 lines, use csv+io+json). Output print(json.dumps({"result":...})). Reply JSON only: {"python":"one-liner or 5 lines","summary":"10 words","enough":true/false,"reason":"5 words"}';
     const cb = sums.length > 0 ? '\n\nKnown findings: ' + sums.map((s, j) => (j + 1) + ': ' + s).join('; ') : '';
     const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nOne hypothesis only.';
     const t0 = Date.now();
-    const raw = await this.call(sp, um, 4000);
+    const raw = await this.call(sp, um, 800);
     console.log('[LLM] iter=' + i + ' elapsed=' + (Date.now() - t0) + 'ms len=' + raw.length);
     return this.parse(raw, i);
   }
