@@ -6,6 +6,8 @@ import { OutputFormatter } from './output';
 const MAX_ITERATIONS = 10;
 const KIMI_TIMEOUT_MS = 30000;
 const JUDGE0_TIMEOUT_MS = 15000;
+// TODO_TEMP TD-003: таймауты с запасом — оценить после стабилизации
+// ТРИГГЕР: после 3 успешных тестов подряд с Qwen на Gonka
 
 export interface Env {
   KV: KVNamespace;
@@ -81,6 +83,15 @@ export class AnalysisOrchestrator {
   private async runAnalysis(sessionId: string, csvRaw: string, fileName: string, question: string, maxIter: number): Promise<void> {
     const kimi = new KimiClient(this.env.GONKA_PRIVATE_KEY, this.env.GONKA_ADDRESS);
     const formatter = new OutputFormatter();
+
+    // In-memory state — KV не читаем на каждой итерации
+    const memState: SessionState = { status: 'running', iteration: 0, maxIterations: maxIter, summaries: [], outputs: [], progressMessage: 'Initializing...', createdAt: Date.now(), updatedAt: Date.now() };
+
+    const flushToKV = async (patch: Partial<SessionState>) => {
+      Object.assign(memState, patch, { updatedAt: Date.now() });
+      await this.saveSession(sessionId, memState);
+    };
+
     try {
       const connector = new CSVConnector();
       const normalized = connector.parse(csvRaw, fileName);
@@ -90,44 +101,60 @@ export class AnalysisOrchestrator {
       await e2b.uploadCSV(sandboxId, normalized.csvString);
       const summaries: string[] = [];
       const outputs: string[] = [];
+
       for (let i = 1; i <= maxIter; i++) {
         console.log('[orchestrator] iteration ' + i + '/' + maxIter);
-        await this.updateSession(sessionId, { iteration: i, progressMessage: getProgressMessage(i, maxIter), summaries, outputs });
+
+        // Пишем в KV только каждые 3 итерации + всегда первую и последнюю
+        if (i === 1 || i % 3 === 0) {
+          await flushToKV({ iteration: i, progressMessage: getProgressMessage(i, maxIter), summaries, outputs });
+        } else {
+          Object.assign(memState, { iteration: i, progressMessage: getProgressMessage(i, maxIter), updatedAt: Date.now() });
+        }
+
         let iterResult;
         try {
           iterResult = await withTimeout(kimi.generateIteration(description, question, summaries, i, maxIter), KIMI_TIMEOUT_MS, 'kimi');
         } catch (e) {
           console.error('[orchestrator] kimi error iter ' + i + ': ' + String(e));
-          summaries.push('Iteration ' + i + ': kimi error');
+          summaries.push('Iteration ' + i + ': kimi error — ' + String(e).slice(0, 80));
           continue;
         }
+
         let execOutput = '';
         try {
           const execResult = await withTimeout(e2b.runCode(sandboxId, iterResult.python), JUDGE0_TIMEOUT_MS, 'judge0');
           execOutput = execResult.stdout || execResult.stderr || '';
+          // Логируем ошибки выполнения — агент должен знать что код не сработал
+          if (execResult.error) {
+            console.log('[orchestrator] judge0 exec error iter=' + i + ': ' + execResult.error.slice(0, 100));
+            execOutput = 'exec_error: ' + execResult.error.slice(0, 200);
+          }
         } catch (e) {
           execOutput = 'Execution error: ' + String(e).slice(0, 200);
         }
+
         outputs.push(execOutput);
         summaries.push(iterResult.summary);
         console.log('[orchestrator] enough=' + iterResult.enough + ' summary=' + iterResult.summary);
         if (iterResult.enough) { console.log('[orchestrator] early exit at ' + i); break; }
       }
-      await this.updateSession(sessionId, { progressMessage: 'Forming final report...', summaries, outputs });
+
+      await flushToKV({ progressMessage: 'Forming final report...', summaries, outputs });
+
       let finalSummary = '';
       try {
         finalSummary = await withTimeout(kimi.generateFinalAnalysis(question, summaries), KIMI_TIMEOUT_MS, 'final');
       } catch (e) {
-        finalSummary = summaries.join(' ');
+        finalSummary = summaries.length > 0 ? summaries.join(' ') : 'Анализ завершён, но финальный отчёт не сформирован.';
       }
+
       const { metrics, charts } = formatter.parseExecutionResult(outputs.join('\n'));
-      const finalState = await this.loadSession(sessionId);
-      await this.saveSession(sessionId, { ...finalState!, status: 'completed', iteration: summaries.length, summaries, outputs, progressMessage: 'Analysis completed', result: { summary: finalSummary, metrics, charts }, updatedAt: Date.now() });
+      await flushToKV({ status: 'completed', iteration: summaries.length, summaries, outputs, progressMessage: 'Analysis completed', result: { summary: finalSummary, metrics, charts } });
       console.log('[orchestrator] completed sessionId=' + sessionId);
     } catch (e) {
       console.error('[orchestrator] fatal: ' + String(e));
-      const state = await this.loadSession(sessionId);
-      await this.saveSession(sessionId, { ...state!, status: 'error', error: String(e).slice(0, 500), progressMessage: 'Error', updatedAt: Date.now() });
+      await flushToKV({ status: 'error', error: String(e).slice(0, 500), progressMessage: 'Error' });
     }
   }
 
@@ -139,11 +166,5 @@ export class AnalysisOrchestrator {
 
   private async saveSession(sessionId: string, state: SessionState): Promise<void> {
     await this.env.KV.put('session:' + sessionId, JSON.stringify(state), { expirationTtl: 86400 });
-  }
-
-  private async updateSession(sessionId: string, patch: Partial<SessionState>): Promise<void> {
-    const state = await this.loadSession(sessionId);
-    if (!state) return;
-    await this.saveSession(sessionId, { ...state, ...patch, updatedAt: Date.now() });
   }
 }
