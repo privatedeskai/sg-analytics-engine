@@ -114,7 +114,7 @@ export class KimiClient {
 
   private parse(raw: string, i: number): IterationResult {
     try {
-      const stripped = raw.replace(/\\\(?:json)?\n?/g, '').replace(/\\\/g, '').trim();
+      const stripped = raw.replace(/```(?:json)?/g, "").replace(/```/g, "").trim();
       const fixed = fixJsonString(stripped);
       const p = JSON.parse(fixed);
       if (p && typeof p === 'object' && p.python) {
