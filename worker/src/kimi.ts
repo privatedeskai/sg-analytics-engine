@@ -71,7 +71,6 @@ async function collectStream(response: Response): Promise<string> {
 async function callGonka(body: object, privateKeyHex: string, providerAddress: string): Promise<string> {
   const payloadString = JSON.stringify(body);
   let lastError = '';
-
   for (const node of GONKA_NODES) {
     try {
       const timestampNs = BigInt(Date.now()) * 1_000_000n;
@@ -159,4 +158,21 @@ export class KimiClient {
       const enoughMatch = raw.match(/"enough"\s*:\s*(true|false)/);
       const reasonMatch = raw.match(/"reason"\s*:\s*"([^"]{0,100})"/);
       if (pythonMatch || summaryMatch) {
-        con
+        console.log('[LLM] parse fallback regex iter=' + i);
+        return {
+          python: this.extractCode(pythonMatch?.[1]?.replace(/\\n/g, '\n').replace(/\\"/g, '"') || raw),
+          summary: summaryMatch?.[1] || 'iter ' + i + ' (partial parse)',
+          enough: enoughMatch?.[1] === 'true',
+          reason: reasonMatch?.[1] || 'partial parse',
+        };
+      }
+    } catch (_) {}
+    console.log('[LLM] parse failed completely iter=' + i + ' raw=' + raw.slice(0, 100));
+    return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
+  }
+
+  private extractCode(t: string): string {
+    const m = t.match(/```(?:python)?\n?([\s\S]*?)```/);
+    return m ? m[1].trim() : t.trim();
+  }
+}
