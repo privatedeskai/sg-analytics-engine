@@ -1,4 +1,4 @@
-import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { createGonkaSignature } from './gonka-signature.js';
 
 export interface IterationResult {
   python: string; summary: string; enough: boolean; reason: string;
@@ -13,40 +13,6 @@ const GONKA_NODES = [
 
 const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
 const NODE_TIMEOUT_MS = 8000;
-
-function hexToBytes(hex: string): Uint8Array {
-  const h = hex.startsWith('0x') ? hex.slice(2) : hex;
-  const arr = new Uint8Array(h.length / 2);
-  for (let i = 0; i < arr.length; i++) arr[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-  return arr;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
-
-async function sha256Bytes(data: string): Promise<Uint8Array> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
-  return new Uint8Array(buf);
-}
-
-async function buildSignature(
-  payloadString: string,
-  timestampNs: bigint,
-  providerAddress: string,
-  privateKeyHex: string
-): Promise<{ authHeader: string; timestamp: string }> {
-  const hash = await sha256Bytes(payloadString + timestampNs.toString() + providerAddress);
-  const sig = secp256k1.sign(hash, hexToBytes(privateKeyHex), { lowS: true });
-  const r = sig.r.toString(16).padStart(64, '0');
-  const s = sig.s.toString(16).padStart(64, '0');
-  return {
-    authHeader: bytesToBase64(hexToBytes(r + s)),
-    timestamp: timestampNs.toString(),
-  };
-}
 
 async function collectStream(response: Response): Promise<string> {
   const reader = response.body!.getReader();
@@ -74,12 +40,12 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
   for (const node of GONKA_NODES) {
     try {
       const timestampNs = BigInt(Date.now()) * 1_000_000n;
-      const { authHeader, timestamp } = await buildSignature(payloadString, timestampNs, providerAddress, privateKeyHex);
+      const authHeader = await createGonkaSignature(privateKeyHex, body, timestampNs, providerAddress);
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
         'X-Requester-Address': providerAddress,
-        'X-Timestamp': timestamp,
+        'X-Timestamp': timestampNs.toString(),
       };
       const res = await fetch(node + '/v1/chat/completions', {
         method: 'POST',
@@ -167,7 +133,7 @@ export class KimiClient {
         };
       }
     } catch (_) {}
-    console.log('[LLM] parse failed completely iter=' + i + ' raw=' + raw.slice(0, 100));
+    console.log('[LLM] parse failed iter=' + i + ' raw=' + raw.slice(0, 100));
     return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
   }
 
