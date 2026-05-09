@@ -1,4 +1,4 @@
-import { createGonkaSignature } from './gonka-signature.js';
+﻿import { createGonkaSignature } from './gonka-signature.js';
 
 export interface IterationResult {
   python: string; summary: string; enough: boolean; reason: string;
@@ -98,7 +98,7 @@ export class KimiClient {
   }
 
   async generateFinalAnalysis(q: string, sums: string[], lang = 'ru'): Promise<string> {
-    if (sums.length === 0) return 'Анализ не дал результатов — все итерации завершились с ошибкой.';
+    if (sums.length === 0) return 'Analysis returned no results.';
     const l = lang === 'ru' ? 'Respond in Russian. Plain text, no markdown.' : 'Respond in English. Plain text.';
     const s = 'You are a business analyst. ' + l + ' Give summary, key findings, 1 actionable recommendation.';
     const m = 'Question: ' + q + '\n\nFindings:\n' + sums.map((s, i) => (i + 1) + '. ' + s).join('\n');
@@ -114,7 +114,7 @@ export class KimiClient {
 
   private parse(raw: string, i: number): IterationResult {
     try {
-      const stripped = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
+      const stripped = raw.replace(/\\\(?:json)?\n?/g, '').replace(/\\\/g, '').trim();
       const fixed = fixJsonString(stripped);
       const p = JSON.parse(fixed);
       if (p && typeof p === 'object' && p.python) {
