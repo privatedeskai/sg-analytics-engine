@@ -4,15 +4,9 @@ export interface IterationResult {
   python: string; summary: string; enough: boolean; reason: string;
 }
 
-const GONKA_NODES = [
-  'https://node4.gonka.ai',
-  'https://node1.gonka.ai',
-  'https://node2.gonka.ai',
-  'https://node3.gonka.ai',
-];
-
+const GONKA_NODES = ['https://node4.gonka.ai'];
 const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
-const NODE_TIMEOUT_MS = 8000;
+const NODE_TIMEOUT_MS = 15000;
 
 async function collectStream(response: Response): Promise<string> {
   const reader = response.body!.getReader();
@@ -60,8 +54,8 @@ async function callGonka(body: object, privateKeyHex: string, providerAddress: s
         continue;
       }
       const text = await collectStream(res);
-      if (!text || text.length < 5) {
-        console.log('[LLM] ' + node + ' empty response, trying next');
+      if (!text || text.length < 10) {
+        console.log('[LLM] ' + node + ' empty response, retrying once');
         lastError = 'empty response';
         continue;
       }
@@ -80,9 +74,9 @@ export class KimiClient {
   constructor(private key: string, private address: string) {}
 
   async generateIteration(dd: string, q: string, sums: string[], i: number, max: number): Promise<IterationResult> {
-    const sp = 'You are a Python data analyst. Write Python under 25 lines for ONE hypothesis. FORBIDDEN: pandas/numpy. CSV in CSV_DATA. Output: print(json.dumps({"result":...})). Respond with JSON only, no markdown: {"python":"...","summary":"...","enough":true/false,"reason":"..."}';
+    const sp = 'You are a Python data analyst. Respond ONLY with a single JSON object, no markdown, no explanation, no code blocks. Format: {"python":"<python code as single line with \\n for newlines>","summary":"<30 words>","enough":true/false,"reason":"<reason>"}. Python rules: under 20 lines, no pandas/no numpy, CSV available as string in CSV_DATA variable, use csv module, output print(json.dumps({"result":...})).';
     const cb = sums.length > 0 ? '\n\nKnown findings: ' + sums.map((s, j) => (j + 1) + ': ' + s).join('; ') : '';
-    const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nOne hypothesis only.';
+    const um = 'Schema:\n' + dd + '\n\nQuestion: ' + q + ' (iter ' + i + '/' + max + ')' + cb + '\n\nRespond with JSON only.';
     const t0 = Date.now();
     const raw = await this.call(sp, um, 2000);
     console.log('[LLM] iter=' + i + ' elapsed=' + (Date.now() - t0) + 'ms len=' + raw.length);
@@ -106,39 +100,39 @@ export class KimiClient {
   }
 
   private parse(raw: string, i: number): IterationResult {
+    // Попытка 1 — чистый JSON
     try {
       const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
       const p = JSON.parse(clean);
-      if (p && typeof p === 'object') {
+      if (p && typeof p === 'object' && p.python) {
+        console.log('[LLM] parse ok iter=' + i);
         return {
-          python: this.extractCode(p.python || ''),
+          python: p.python.replace(/\\n/g, '\n').replace(/\\t/g, '  '),
           summary: (p.summary || '').slice(0, 200),
           enough: Boolean(p.enough),
           reason: (p.reason || '').slice(0, 100),
         };
       }
     } catch (_) {}
+
+    // Попытка 2 — найти JSON объект внутри текста
     try {
-      const pythonMatch = raw.match(/"python"\s*:\s*"([\s\S]*?)(?<!\\)"/);
-      const summaryMatch = raw.match(/"summary"\s*:\s*"([^"]{0,200})"/);
-      const enoughMatch = raw.match(/"enough"\s*:\s*(true|false)/);
-      const reasonMatch = raw.match(/"reason"\s*:\s*"([^"]{0,100})"/);
-      if (pythonMatch || summaryMatch) {
-        console.log('[LLM] parse fallback regex iter=' + i);
-        return {
-          python: this.extractCode(pythonMatch?.[1]?.replace(/\\n/g, '\n').replace(/\\"/g, '"') || raw),
-          summary: summaryMatch?.[1] || 'iter ' + i + ' (partial parse)',
-          enough: enoughMatch?.[1] === 'true',
-          reason: reasonMatch?.[1] || 'partial parse',
-        };
+      const jsonMatch = raw.match(/\{[\s\S]*"python"[\s\S]*\}/);
+      if (jsonMatch) {
+        const p = JSON.parse(jsonMatch[0]);
+        if (p && p.python) {
+          console.log('[LLM] parse json-extract iter=' + i);
+          return {
+            python: p.python.replace(/\\n/g, '\n').replace(/\\t/g, '  '),
+            summary: (p.summary || '').slice(0, 200),
+            enough: Boolean(p.enough),
+            reason: (p.reason || '').slice(0, 100),
+          };
+        }
       }
     } catch (_) {}
-    console.log('[LLM] parse failed iter=' + i + ' raw=' + raw.slice(0, 100));
-    return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
-  }
 
-  private extractCode(t: string): string {
-    const m = t.match(/```(?:python)?\n?([\s\S]*?)```/);
-    return m ? m[1].trim() : t.trim();
+    console.log('[LLM] parse failed iter=' + i + ' raw=' + raw.slice(0, 150));
+    return { python: '', summary: 'parse failed iter ' + i, enough: false, reason: 'parse failed' };
   }
 }
