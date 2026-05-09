@@ -10,8 +10,12 @@ const GONKA_NODES = [
   'https://node2.gonka.ai',
   'https://node3.gonka.ai',
 ];
+
 // TD-007: модель Qwen3-235B (Kimi-K2.6 недоступна на node4, переключено в сессии 10)
 const MODEL = 'Qwen/Qwen3-235B-A22B-Instruct-2507-FP8';
+
+// Таймаут на один запрос к ноде — 8 сек. Итого максимум 4 × 8 = 32 сек вместо 4 × 30 = 120 сек
+const NODE_TIMEOUT_MS = 8000;
 
 function hexToBytes(hex: string): Uint8Array {
   const h = hex.startsWith('0x') ? hex.slice(2) : hex;
@@ -69,29 +73,50 @@ async function collectStream(response: Response): Promise<string> {
 
 async function callGonka(body: object, privateKeyHex: string, providerAddress: string): Promise<string> {
   const payloadString = JSON.stringify(body);
-  const timestampNs = BigInt(Date.now()) * 1_000_000n;
-  const { authHeader, timestamp } = await buildSignature(payloadString, timestampNs, providerAddress, privateKeyHex);
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': authHeader,
-    'X-Requester-Address': providerAddress,
-    'X-Timestamp': timestamp,
-  };
+  let lastError = '';
+
   for (const node of GONKA_NODES) {
     try {
-      const res = await fetch(node + '/v1/chat/completions', { method: 'POST', headers, body: payloadString });
+      // Пересчитываем timestamp для каждой ноды — старая подпись может быть отклонена
+      const timestampNs = BigInt(Date.now()) * 1_000_000n;
+      const { authHeader, timestamp } = await buildSignature(payloadString, timestampNs, providerAddress, privateKeyHex);
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+        'X-Requester-Address': providerAddress,
+        'X-Timestamp': timestamp,
+      };
+
+      const res = await fetch(node + '/v1/chat/completions', {
+        method: 'POST',
+        headers,
+        body: payloadString,
+        signal: AbortSignal.timeout(NODE_TIMEOUT_MS),
+      });
+
       if (!res.ok) {
-        console.log('[LLM] ' + node + ' status=' + res.status + ' ' + (await res.text()).slice(0, 100));
+        const errText = (await res.text()).slice(0, 100);
+        console.log('[LLM] ' + node + ' status=' + res.status + ' ' + errText);
+        lastError = 'HTTP ' + res.status;
         continue;
       }
+
       const text = await collectStream(res);
+      if (!text || text.length < 5) {
+        console.log('[LLM] ' + node + ' empty response, trying next node');
+        lastError = 'empty response';
+        continue;
+      }
+
       console.log('[LLM] success node=' + node + ' chars=' + text.length);
       return text;
     } catch (e: any) {
-      console.log('[LLM] ' + node + ' failed: ' + e.message);
+      const msg = e?.name === 'TimeoutError' ? 'timeout ' + NODE_TIMEOUT_MS + 'ms' : e.message;
+      console.log('[LLM] ' + node + ' failed: ' + msg);
+      lastError = msg;
     }
   }
-  throw new Error('All Gonka nodes failed');
+  throw new Error('All Gonka nodes failed. Last error: ' + lastError);
 }
 
 export class KimiClient {
@@ -108,6 +133,7 @@ export class KimiClient {
   }
 
   async generateFinalAnalysis(q: string, sums: string[], lang = 'ru'): Promise<string> {
+    if (sums.length === 0) return 'Анализ не дал результатов — все итерации завершились с ошибкой.';
     const l = lang === 'ru' ? 'Respond in Russian. Plain text, no markdown.' : 'Respond in English. Plain text.';
     const s = 'You are a business analyst. ' + l + ' Give summary, key findings, 1 actionable recommendation.';
     const m = 'Question: ' + q + '\n\nFindings:\n' + sums.map((s, i) => (i + 1) + '. ' + s).join('\n');
@@ -123,18 +149,41 @@ export class KimiClient {
   }
 
   private parse(raw: string, i: number): IterationResult {
+    // Попытка 1 — чистый JSON после удаления markdown-блоков
     try {
       const clean = raw.replace(/```(?:json)?\n?/g, '').replace(/```/g, '').trim();
       const p = JSON.parse(clean);
-      return {
-        python: this.extractCode(p.python || ''),
-        summary: (p.summary || '').slice(0, 200),
-        enough: Boolean(p.enough),
-        reason: (p.reason || '').slice(0, 100),
-      };
-    } catch (_) {
-      return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
-    }
+      if (p && typeof p === 'object') {
+        return {
+          python: this.extractCode(p.python || ''),
+          summary: (p.summary || '').slice(0, 200),
+          enough: Boolean(p.enough),
+          reason: (p.reason || '').slice(0, 100),
+        };
+      }
+    } catch (_) {}
+
+    // Попытка 2 — regex-извлечение из частично сломанного JSON
+    try {
+      const pythonMatch = raw.match(/"python"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+      const summaryMatch = raw.match(/"summary"\s*:\s*"([^"]{0,200})"/);
+      const enoughMatch = raw.match(/"enough"\s*:\s*(true|false)/);
+      const reasonMatch = raw.match(/"reason"\s*:\s*"([^"]{0,100})"/);
+
+      if (pythonMatch || summaryMatch) {
+        console.log('[LLM] parse fallback regex iter=' + i);
+        return {
+          python: this.extractCode(pythonMatch?.[1]?.replace(/\\n/g, '\n').replace(/\\"/g, '"') || raw),
+          summary: summaryMatch?.[1] || 'iter ' + i + ' (partial parse)',
+          enough: enoughMatch?.[1] === 'true',
+          reason: reasonMatch?.[1] || 'partial parse',
+        };
+      }
+    } catch (_) {}
+
+    // Попытка 3 — совсем сломано, берём как есть
+    console.log('[LLM] parse failed completely iter=' + i + ' raw=' + raw.slice(0, 100));
+    return { python: this.extractCode(raw), summary: 'fallback iter ' + i, enough: false, reason: 'parse failed' };
   }
 
   private extractCode(t: string): string {
